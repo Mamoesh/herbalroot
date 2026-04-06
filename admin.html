@@ -121,7 +121,8 @@ window.switchSection = s => {
     el.classList.toggle('active', el.dataset.section === s));
   const main = document.getElementById('main-panel');
   main.innerHTML = '';
-  if (s === 'thema')  { renderThema(); return; }
+  if (s === 'thema')  { renderThema();  return; }
+  if (s === 'import') { renderImport(); return; }
   renderSection(s);
 };
 
@@ -370,6 +371,129 @@ window.saveTheme = async () => {
   } catch(e) { toast('Fout: '+e.message,'err'); }
 };
 
+// ── Import startdata ──────────────────────────────────────────
+function renderImport() {
+  document.getElementById('main-panel').innerHTML = `
+    <div class="panel-header">
+      <div>
+        <h2>📥 Importeer startdata</h2>
+        <p class="panel-sub">Laad alle bestaande planten uit de app naar Firebase — doe dit eenmalig.</p>
+      </div>
+    </div>
+    <div class="import-box">
+      <div class="import-icon">🌿</div>
+      <h3>Eénmalige import</h3>
+      <p>De app bevat <strong>44 kruiden</strong>, <strong>16 groenten</strong> en <strong>10 fruitsoorten</strong> die momenteel hard-coded in de app staan.</p>
+      <p>Met deze knop worden ze allemaal in Firebase opgeslagen. Daarna kun je ze via dit dashboard bewerken en worden wijzigingen live in de app getoond.</p>
+      <div class="import-warning">⚠️ Bestaande planten in Firebase met hetzelfde ID worden overschreven.</div>
+      <button class="btn-primary" style="margin-top:1.25rem;padding:.85rem 2rem;font-size:.95rem"
+        id="import-btn" onclick="importAllPlants()">
+        🚀 Importeer alle planten naar Firebase
+      </button>
+      <div id="import-progress" style="margin-top:1.25rem"></div>
+    </div>`;
+}
+
+window.importAllPlants = async () => {
+  const btn = document.getElementById('import-btn');
+  const progress = document.getElementById('import-progress');
+  btn.disabled = true;
+  btn.textContent = '⏳ Bezig met laden…';
+
+  try {
+    // Fetch index.html en extraheer de plantdata
+    progress.innerHTML = '<div class="prog-line">📄 index.html ophalen…</div>';
+    const res  = await fetch('./index.html');
+    const html = await res.text();
+
+    // Extraheer de drie arrays als tekst
+    progress.innerHTML += '<div class="prog-line">🔍 Plantdata analyseren…</div>';
+
+    function extractArray(html, startMarker, endMarker) {
+      const start = html.indexOf(startMarker);
+      const end   = html.indexOf(endMarker, start);
+      if (start === -1 || end === -1) return [];
+      let raw = html.slice(start + startMarker.length, end).trim();
+      // Verwijder trailing comma
+      raw = raw.replace(/,\s*$/, '');
+      // Zet elke plant-entry om naar een JSON-veilig object
+      const plants = [];
+      // Gebruik Function() om de JS-array te evalueren — veilig want eigen code
+      try {
+        const arr = new Function(`
+          const now = ${Date.now()};
+          return [${raw}];
+        `)();
+        arr.forEach(p => {
+          if (!p || !p.id) return;
+          // Maak het object JSON-serialiseerbaar
+          const clean = {};
+          Object.keys(p).forEach(k => {
+            const v = p[k];
+            if (typeof v === 'function') return;
+            if (typeof v === 'number' && !isFinite(v)) return;
+            clean[k] = v;
+          });
+          clean.watered = Date.now();
+          plants.push(clean);
+        });
+      } catch(e) {
+        console.error('Parse error:', e);
+      }
+      return plants;
+    }
+
+    const herbs    = extractArray(html, 'const HERBS=[',       'const GROENTEN');
+    const groenten = extractArray(html, 'const GROENTEN = [',  'const FRUIT');
+    const fruit    = extractArray(html, 'const FRUIT = [',     '// ═══════════════════════════════════════════════════════════════\n// GROENTEN & FRUIT STATE');
+
+    progress.innerHTML += `<div class="prog-line">✅ Gevonden: ${herbs.length} kruiden, ${groenten.length} groenten, ${fruit.length} fruit</div>`;
+
+    // Upload naar Firestore per categorie
+    const categories = [
+      { name: 'kruiden',   data: herbs,    label: 'kruiden' },
+      { name: 'groenten',  data: groenten, label: 'groenten' },
+      { name: 'fruit',     data: fruit,    label: 'fruitsoorten' },
+    ];
+
+    let totalOk = 0, totalErr = 0;
+
+    for (const cat of categories) {
+      progress.innerHTML += `<div class="prog-line">📤 ${cat.data.length} ${cat.label} uploaden…</div>`;
+      let ok = 0, err = 0;
+      for (const plant of cat.data) {
+        try {
+          await setDoc(doc(db, cat.name, plant.id), plant);
+          ok++;
+        } catch(e) {
+          err++;
+          console.error('Fout bij', plant.id, e);
+        }
+      }
+      totalOk  += ok;
+      totalErr += err;
+      progress.innerHTML += `<div class="prog-line prog-ok">✓ ${ok} ${cat.label} opgeslagen${err ? ` (${err} fouten)` : ''}</div>`;
+
+      // Update lokale cache
+      allPlants[cat.name] = cat.data;
+    }
+
+    // Klaar
+    progress.innerHTML += `
+      <div class="prog-done">
+        🎉 Import klaar! <strong>${totalOk} planten</strong> staan nu in Firebase.
+        ${totalErr ? `<br><span style="color:var(--danger)">${totalErr} planten konden niet worden opgeslagen.</span>` : ''}
+        <br><br>Ga naar Kruiden, Groenten of Fruit om ze te bewerken.
+      </div>`;
+    btn.textContent = '✅ Import voltooid';
+
+  } catch(e) {
+    progress.innerHTML += `<div class="prog-err">❌ Fout: ${e.message}</div>`;
+    btn.disabled = false;
+    btn.textContent = '🚀 Opnieuw proberen';
+  }
+};
+
 // ── Toast ─────────────────────────────────────────────────────
 function toast(msg, type='ok') {
   const el = document.getElementById('toast');
@@ -563,6 +687,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .toast.toast-err{border-color:var(--danger);color:var(--danger);}
 .toast.toast-info{border-color:var(--accent2);color:var(--accent2);}
 
+.import-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:2rem;max-width:580px;}
+.import-icon{font-size:3rem;margin-bottom:.75rem;}
+.import-box h3{font-family:'Playfair Display',serif;color:var(--accent3);font-size:1.2rem;margin-bottom:.75rem;}
+.import-box p{color:var(--text2);font-size:.88rem;line-height:1.75;margin-bottom:.5rem;}
+.import-warning{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.25);
+  border-radius:8px;padding:.65rem 1rem;font-size:.82rem;color:var(--accent2);margin-top:.75rem;}
+.prog-line{padding:.3rem 0;font-size:.85rem;color:var(--text2);border-bottom:1px solid var(--border);}
+.prog-ok{color:var(--accent);}
+.prog-err{color:var(--danger);}
+.prog-done{margin-top:1rem;background:rgba(126,200,126,.08);border:1px solid rgba(126,200,126,.25);
+  border-radius:10px;padding:1rem 1.25rem;font-size:.88rem;color:var(--text);line-height:1.75;}
+
 .unsplash-thumb{position:relative;border-radius:8px;overflow:hidden;cursor:pointer;
   border:2px solid var(--border);transition:border .2s;aspect-ratio:3/2;}
 .unsplash-thumb:hover{border-color:var(--accent);}
@@ -623,6 +760,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="nav-item" data-section="fruit" onclick="switchSection('fruit')">🍎 Fruit</div>
       <div class="nav-label" style="margin-top:.5rem">Instellingen</div>
       <div class="nav-item" data-section="thema" onclick="switchSection('thema')">🎨 Thema & Kleuren</div>
+      <div class="nav-label" style="margin-top:.5rem">Data</div>
+      <div class="nav-item" data-section="import" onclick="switchSection('import')">📥 Importeer startdata</div>
     </nav>
     <div class="sidebar-user">
       <img id="user-avatar" alt="avatar">
