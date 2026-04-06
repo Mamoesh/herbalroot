@@ -3695,29 +3695,38 @@ async function loadFirebaseData() {
       const snap = await getDocs(collection(db, col));
       snap.docs.forEach(d => {
         const data = { ...d.data(), id: d.id };
-        // Zet cp en watered goed
         data.cp      = data.cp      ?? 0;
         data.watered = data.watered ?? Date.now();
         data.ph_stages = data.ph_stages ?? ['🌱','🌿','🌸','🌼'];
-
         const idx = arr.findIndex(p => p.id === data.id);
-        if (idx >= 0) {
-          // Bestaande plant overschrijven met Firebase-versie
-          arr[idx] = data;
-        } else {
-          // Nieuwe plant toevoegen
-          arr.push(data);
-        }
+        if (idx >= 0) arr[idx] = data; else arr.push(data);
       });
     }
 
-    // Herrender de actieve sectie
+    // Recepten laden vanuit Firebase
+    const receptSnap = await getDocs(collection(db, 'recepten'));
+    if (!receptSnap.empty) {
+      receptSnap.docs.forEach(d => {
+        RECEPTEN_DB[d.id] = d.data();
+      });
+    }
+
+    // Community posts laden vanuit Firebase
+    const postSnap = await getDocs(collection(db, 'community'));
+    if (!postSnap.empty) {
+      const fbPosts = postSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a,b) => (b.ts||0) - (a.ts||0));
+      // Sla op in localStorage zodat de community-render ze oppikt
+      localStorage.setItem('hr_posts', JSON.stringify(fbPosts));
+    }
+
+    // Herrender alles
     renderHerbs();
     renderGroenten();
     renderFruit();
     console.log('Firebase data geladen ✓');
   } catch(e) {
-    // Stilletjes falen — app werkt gewoon met lokale data
     console.log('Firebase niet beschikbaar, lokale data wordt gebruikt.');
   }
 }
