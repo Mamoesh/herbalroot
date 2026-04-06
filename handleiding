@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HerbalRoot – Handleiding Firebase</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1a0f;--surface:#162016;--surface2:#1e2e1e;--border:#2a3d2a;--accent:#7ec87e;--accent2:#c8a96e;--accent3:#e8d5a3;--text:#e8f0e8;--text2:#9ab09a;--danger:#c87e7e;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);padding:2rem 1rem;max-width:780px;margin:0 auto;}
+h1{font-family:'Playfair Display',serif;color:var(--accent3);font-size:2rem;margin-bottom:.3rem;}
+.intro{color:var(--text2);font-size:.9rem;margin-bottom:2rem;line-height:1.7;}
+.step{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;}
+.step-num{display:inline-block;background:var(--accent);color:#0f1a0f;border-radius:50%;width:28px;height:28px;font-size:.82rem;font-weight:700;text-align:center;line-height:28px;margin-right:.5rem;flex-shrink:0;}
+.step h2{font-size:1.05rem;color:var(--accent3);display:flex;align-items:center;margin-bottom:.9rem;}
+.step ol,.step ul{padding-left:1.3rem;color:var(--text2);font-size:.88rem;line-height:2;}
+.step p{color:var(--text2);font-size:.88rem;line-height:1.75;margin:.4rem 0;}
+pre{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1rem 1.1rem;margin:.75rem 0;overflow-x:auto;}
+code{font-family:'Courier New',monospace;font-size:.8rem;color:var(--accent2);}
+.inline-code{background:var(--surface2);padding:.1rem .4rem;border-radius:4px;color:var(--accent2);font-family:monospace;font-size:.82rem;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+.tip{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.25);border-radius:8px;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:var(--accent2);line-height:1.65;}
+.warning{background:rgba(200,126,126,.08);border:1px solid rgba(200,126,126,.25);border-radius:8px;padding:.75rem 1rem;margin:.75rem 0;font-size:.85rem;color:var(--danger);line-height:1.65;}
+.back-btn{display:inline-block;margin-bottom:1.5rem;color:var(--text2);font-size:.85rem;text-decoration:none;}
+.back-btn:hover{color:var(--accent);}
+.done-box{background:rgba(126,200,126,.08);border:1px solid rgba(126,200,126,.3);border-radius:14px;padding:1.5rem 1.75rem;text-align:center;}
+.done-box h2{font-family:'Playfair Display',serif;color:var(--accent);margin-bottom:.5rem;}
+.done-box p{color:var(--text2);font-size:.9rem;line-height:1.7;}
+</style>
+</head>
+<body>
+
+<a class="back-btn" href="admin.html">← Terug naar beheerderspaneel</a>
+
+<h1>🔥 Firebase instellen</h1>
+<p class="intro">Volg deze stappen om het beheerderspaneel van HerbalRoot te koppelen aan Firebase. Duurt ongeveer 10 minuten. Alles is gratis.</p>
+
+<div class="step">
+  <h2><span class="step-num">1</span>Firebase project aanmaken</h2>
+  <ol>
+    <li>Ga naar <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+    <li>Klik op <strong>Project toevoegen</strong> (of "Add project")</li>
+    <li>Geef het een naam, bijv. <span class="inline-code">herbalroot</span></li>
+    <li>Schakel Google Analytics <strong>uit</strong> (niet nodig) → klik <strong>Project aanmaken</strong></li>
+    <li>Wacht tot het project klaar is en klik op <strong>Doorgaan</strong></li>
+  </ol>
+</div>
+
+<div class="step">
+  <h2><span class="step-num">2</span>Google-aanmelding inschakelen</h2>
+  <ol>
+    <li>Ga in het linkermenu naar <strong>Authentication</strong></li>
+    <li>Klik op <strong>Aan de slag</strong></li>
+    <li>Klik op <strong>Google</strong> bij de lijst met aanmeldingsmethoden</li>
+    <li>Zet de schakelaar op <strong>Ingeschakeld</strong></li>
+    <li>Vul een <strong>Naam voor het project</strong> in (bijv. HerbalRoot) en kies jouw Gmail-adres als ondersteuningse-mail</li>
+    <li>Klik op <strong>Opslaan</strong></li>
+  </ol>
+  <div class="tip">💡 Jouw Gmail-account kan nu direct inloggen — je hoeft geen apart wachtwoord aan te maken.</div>
+</div>
+
+<div class="step">
+  <h2><span class="step-num">3</span>Toegestane domeinen instellen</h2>
+  <ol>
+    <li>Ga in Authentication naar het tabblad <strong>Instellingen</strong></li>
+    <li>Scroll naar <strong>Geautoriseerde domeinen</strong></li>
+    <li>Klik op <strong>Domein toevoegen</strong></li>
+    <li>Voeg jouw GitHub Pages domein toe: <span class="inline-code">JOUW-NAAM.github.io</span></li>
+  </ol>
+  <div class="warning">⚠️ Zonder dit stap krijg je de foutmelding "auth/unauthorized-domain" bij het inloggen.</div>
+</div>
+
+<div class="step">
+  <h2><span class="step-num">4</span>Firestore database aanmaken</h2>
+  <ol>
+    <li>Ga via deze directe link naar jouw Firestore: <a href="https://console.firebase.google.com/project/herbalroot/firestore" target="_blank">console.firebase.google.com/project/herbalroot/firestore</a></li>
+    <li>Klik op <strong>Database maken</strong></li>
+    <li>Kies <strong>Beginnen in productiemodus</strong> → klik <strong>Volgende</strong></li>
+    <li>Bij regio: kies <strong>europe-west1</strong> (België) of <strong>europe-west3</strong> uit de lijst — als de lijst leeg lijkt, scroll dan naar beneden in het dropdown-menu</li>
+    <li>Klik op <strong>Inschakelen</strong> en wacht tot de database klaar is</li>
+    <li>Ga naar het tabblad <strong>Regels</strong> en vervang alles met:</li>
+  </ol>
+<pre><code>rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}</code></pre>
+  <ol start="7"><li>Klik op <strong>Publiceren</strong></li></ol>
+  <div class="tip">💡 Als de regio nog steeds niet werkt: sluit de browser volledig, open een nieuw venster en probeer opnieuw via de directe link hierboven.</div>
+  <div class="warning">⚠️ Lukt het écht niet? Kies dan gewoon <strong>us-central1</strong> — dat werkt altijd en heeft geen invloed op de werking van de app.</div>
+</div>
+
+<div class="step">
+  <h2><span class="step-num">5</span>Storage instellen (voor foto-uploads)</h2>
+  <ol>
+    <li>Ga in het linkermenu naar <strong>Storage</strong></li>
+    <li>Klik op <strong>Aan de slag</strong></li>
+    <li>Kies productiemodus → klik door</li>
+    <li>Ga naar het tabblad <strong>Regels</strong> en vervang alles met:</li>
+  </ol>
+<pre><code>rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}</code></pre>
+  <ol start="5"><li>Klik op <strong>Publiceren</strong></li></ol>
+</div>
+
+<div class="step">
+  <h2><span class="step-num">6</span>Web app registreren en config kopiëren</h2>
+  <ol>
+    <li>Ga naar <strong>Projectoverzicht</strong> (huis-icoon bovenaan links)</li>
+    <li>Klik op het <strong>&lt;/&gt;</strong> icoon (Web-app toevoegen)</li>
+    <li>Geef de app een naam, bijv. <span class="inline-code">HerbalRoot Admin</span></li>
+    <li>Vink <strong>Firebase Hosting</strong> NIET aan → klik <strong>App registreren</strong></li>
+    <li>Je ziet nu jouw <span class="inline-code">firebaseConfig</span>. Kopieer de hele blok:</li>
+  </ol>
+<pre><code>const firebaseConfig = {
+  apiKey: "AIza...",
+  authDomain: "jouw-project.firebaseapp.com",
+  projectId: "jouw-project",
+  storageBucket: "jouw-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123:web:abc123"
+};</code></pre>
+</div>
+
+<div class="step">
+  <h2><span class="step-num">7</span>Config invullen in admin.html</h2>
+  <ol>
+    <li>Open <span class="inline-code">admin.html</span> in een teksteditor (bijv. Kladblok, VS Code of Notepad++)</li>
+    <li>Zoek bovenaan naar het blok met <span class="inline-code">JOUW_API_KEY</span></li>
+    <li>Vervang de hele <span class="inline-code">firebaseConfig</span> met de waarden die je in stap 6 kopieerde</li>
+    <li>Sla het bestand op</li>
+    <li>Upload de gewijzigde <span class="inline-code">admin.html</span> naar je GitHub repo</li>
+  </ol>
+  <div class="tip">💡 Wacht na het uploaden ~1 minuut tot GitHub Pages de nieuwe versie heeft gepubliceerd.</div>
+</div>
+
+<div class="done-box">
+  <h2>🎉 Klaar!</h2>
+  <p>Open <strong>https://JOUW-NAAM.github.io/herbalroot/admin.html</strong> in je browser en klik op <strong>Aanmelden met Google</strong>.<br>
+  Je kunt nu planten toevoegen, bewerken, foto's uploaden en het thema aanpassen.</p>
+  <p style="margin-top:.75rem"><a href="admin.html">← Terug naar beheerderspaneel</a></p>
+</div>
+
+</body>
+</html>
