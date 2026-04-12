@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HerbalRoot – Beheer</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
 <script type="module">
 import { initializeApp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -13,10 +13,6 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// ════════════════════════════════════════════════════════════════
-//  🔧 JOUW FIREBASE CONFIG — vul dit in (zie handleiding.html)
-//     Firebase Console → Project Settings → Jouw web app → Config
-// ════════════════════════════════════════════════════════════════
 const firebaseConfig = {
   apiKey:            "AIzaSyCIbxp7FemPmockRtH2Dx06yZ4_wBEfJkg",
   authDomain:        "herbalroot.firebaseapp.com",
@@ -25,10 +21,8 @@ const firebaseConfig = {
   messagingSenderId: "613071845588",
   appId:             "1:613071845588:web:4f06139e25abeda9bee341"
 };
-// ════════════════════════════════════════════════════════════════
 
 const configured = firebaseConfig.apiKey !== 'JOUW_API_KEY';
-
 let app, auth, db, provider;
 if (configured) {
   app      = initializeApp(firebaseConfig);
@@ -38,31 +32,39 @@ if (configured) {
 } else {
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('config-warning').style.display = 'flex';
-    document.getElementById('login-screen').style.display  = 'none';
+    document.getElementById('login-screen').style.display   = 'none';
   });
 }
 
 // ── State ─────────────────────────────────────────────────────
-let currentSection = 'kruiden';
+let currentSection = 'dashboard';
 let allPlants = { kruiden:[], groenten:[], fruit:[] };
 let editingId = null, editingType = null, themeVars = {};
+let allRecepten = {}, allPosts = [], editingRecept = null;
+
+// ── Page builder state ─────────────────────────────────────────
+let pages = [];          // [{id, title, slug, blocks:[]}]
+let activePage = null;   // page object being edited
+let dragSrc = null;
 
 // ── Auth ──────────────────────────────────────────────────────
 if (configured) {
   onAuthStateChanged(auth, user => {
     if (user) {
       document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app-screen').style.display   = 'flex';
+      document.getElementById('app-screen').style.display   = 'block';
       document.getElementById('user-name').textContent  = user.displayName || user.email;
       document.getElementById('user-email').textContent = user.email;
       if (user.photoURL) {
         document.getElementById('user-avatar').src = user.photoURL;
         document.getElementById('user-avatar').style.display = 'block';
+        document.getElementById('user-fallback').style.display = 'none';
       }
       loadAllData();
       loadTheme();
       loadRecepten();
       loadCommunity();
+      loadPages();
     } else {
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('app-screen').style.display   = 'none';
@@ -73,275 +75,772 @@ if (configured) {
 window.loginWithGoogle = async () => {
   const btn = document.getElementById('google-btn');
   const err = document.getElementById('login-err');
-  btn.disabled = true;
-  btn.textContent = 'Even wachten…';
-  err.textContent = '';
-  try {
-    await signInWithPopup(auth, provider);
-  } catch(e) {
+  btn.disabled = true; btn.textContent = 'Even wachten…'; err.textContent = '';
+  try { await signInWithPopup(auth, provider); }
+  catch(e) {
     let msg = e.message;
-    if (e.code === 'auth/popup-blocked')       msg = 'Pop-up geblokkeerd — sta pop-ups toe voor deze pagina.';
-    if (e.code === 'auth/unauthorized-domain')  msg = 'Dit domein is niet toegestaan in Firebase. Zie handleiding stap 3.';
-    if (e.code === 'auth/cancelled-popup-request') msg = 'Inloggen geannuleerd.';
-    err.textContent = msg;
-    btn.disabled = false;
-    btn.textContent = '🔑  Aanmelden met Google';
+    if (e.code==='auth/popup-blocked') msg='Pop-up geblokkeerd — sta pop-ups toe.';
+    if (e.code==='auth/unauthorized-domain') msg='Dit domein is niet toegestaan in Firebase.';
+    err.textContent = msg; btn.disabled = false; btn.textContent = 'Aanmelden met Google';
   }
 };
-
-window.doLogout = async () => {
-  if (confirm('Uitloggen?')) await signOut(auth);
-};
+window.doLogout = async () => { if(confirm('Uitloggen?')) await signOut(auth); };
 
 // ── Data laden ────────────────────────────────────────────────
 async function loadAllData() {
-  toast('Data laden…','info');
   for (const type of ['kruiden','groenten','fruit']) {
     const snap = await getDocs(collection(db, type));
-    allPlants[type] = snap.docs.map(d => ({...d.data(), id: d.id}));
+    allPlants[type] = snap.docs.map(d => ({...d.data(), id:d.id}));
   }
-  renderSection(currentSection);
-  toast('Data geladen ✓','ok');
+  if (currentSection === 'dashboard') renderDashboard();
+  else renderSection(currentSection);
 }
 
 async function loadTheme() {
   try {
     const snap = await getDocs(collection(db,'settings'));
-    snap.docs.forEach(d => { if (d.id==='theme') themeVars = d.data(); });
-    applyThemeToPage(themeVars);
+    snap.docs.forEach(d => { if(d.id==='theme') themeVars = d.data(); });
+    Object.entries(themeVars).forEach(([k,v]) => document.documentElement.style.setProperty(k,v));
   } catch(e){}
 }
 
-function applyThemeToPage(vars) {
-  Object.entries(vars).forEach(([k,v]) => document.documentElement.style.setProperty(k,v));
+async function loadRecepten() {
+  const snap = await getDocs(collection(db,'recepten'));
+  allRecepten = {};
+  snap.docs.forEach(d => {
+    const data = d.data();
+    const key = data.naam || d.id.replace(/_sl_/g,'/').replace(/_bs_/g,'\\').replace(/_dt_/g,'.').replace(/_/g,' ');
+    allRecepten[key] = data;
+  });
+}
+
+async function loadCommunity() {
+  const snap = await getDocs(collection(db,'community'));
+  allPosts = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
+
+// ── Pages laden ───────────────────────────────────────────────
+async function loadPages() {
+  try {
+    const snap = await getDocs(collection(db,'pages'));
+    pages = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ pages=[]; }
 }
 
 // ── Navigatie ─────────────────────────────────────────────────
 window.switchSection = s => {
   currentSection = s;
   document.querySelectorAll('.nav-item').forEach(el =>
-    el.classList.toggle('active', el.dataset.section === s));
+    el.classList.toggle('active', el.dataset.section===s));
   const main = document.getElementById('main-panel');
   main.innerHTML = '';
-  if (s === 'thema')     { renderThema();     return; }
-  if (s === 'import')    { renderImport();    return; }
-  if (s === 'recepten')  { renderRecepten();  return; }
-  if (s === 'community') { renderCommunity(); return; }
-  renderSection(s);
+  const map = {
+    dashboard: renderDashboard,
+    kruiden:   ()=>renderSection('kruiden'),
+    groenten:  ()=>renderSection('groenten'),
+    fruit:     ()=>renderSection('fruit'),
+    recepten:  renderRecepten,
+    community: renderCommunity,
+    paginas:   renderPageManager,
+    thema:     renderThema,
+    import:    renderImport,
+  };
+  if (map[s]) map[s]();
 };
+
+// ── Dashboard ─────────────────────────────────────────────────
+function renderDashboard() {
+  const total = (allPlants.kruiden?.length||0) + (allPlants.groenten?.length||0) + (allPlants.fruit?.length||0);
+  document.getElementById('main-panel').innerHTML = `
+    <div class="page-title">Dashboard</div>
+    <div class="stat-grid">
+      <div class="stat-card" onclick="switchSection('kruiden')">
+        <div class="stat-icon">🌱</div>
+        <div class="stat-num">${allPlants.kruiden?.length||0}</div>
+        <div class="stat-label">Kruiden</div>
+      </div>
+      <div class="stat-card" onclick="switchSection('groenten')">
+        <div class="stat-icon">🥦</div>
+        <div class="stat-num">${allPlants.groenten?.length||0}</div>
+        <div class="stat-label">Groenten</div>
+      </div>
+      <div class="stat-card" onclick="switchSection('fruit')">
+        <div class="stat-icon">🍎</div>
+        <div class="stat-num">${allPlants.fruit?.length||0}</div>
+        <div class="stat-label">Fruit</div>
+      </div>
+      <div class="stat-card" onclick="switchSection('recepten')">
+        <div class="stat-icon">🍳</div>
+        <div class="stat-num">${Object.keys(allRecepten).length}</div>
+        <div class="stat-label">Recepten</div>
+      </div>
+      <div class="stat-card" onclick="switchSection('community')">
+        <div class="stat-icon">💬</div>
+        <div class="stat-num">${allPosts.length}</div>
+        <div class="stat-label">Community posts</div>
+      </div>
+      <div class="stat-card" onclick="switchSection('paginas')">
+        <div class="stat-icon">📄</div>
+        <div class="stat-num">${pages.length}</div>
+        <div class="stat-label">Pagina's</div>
+      </div>
+    </div>
+    <div class="dash-actions">
+      <div class="dash-section-title">Snelle acties</div>
+      <div class="quick-actions">
+        <button class="qa-btn" onclick="switchSection('kruiden');setTimeout(()=>openEditor(null,'kruiden'),50)">
+          <span class="qa-icon">🌱</span><span>Nieuw kruid</span>
+        </button>
+        <button class="qa-btn" onclick="switchSection('groenten');setTimeout(()=>openEditor(null,'groenten'),50)">
+          <span class="qa-icon">🥦</span><span>Nieuwe groente</span>
+        </button>
+        <button class="qa-btn" onclick="switchSection('fruit');setTimeout(()=>openEditor(null,'fruit'),50)">
+          <span class="qa-icon">🍎</span><span>Nieuw fruit</span>
+        </button>
+        <button class="qa-btn" onclick="switchSection('paginas');setTimeout(()=>openPageEditor(null),100)">
+          <span class="qa-icon">📄</span><span>Nieuwe pagina</span>
+        </button>
+        <button class="qa-btn" onclick="switchSection('recepten');setTimeout(()=>openReceptEditor(null),50)">
+          <span class="qa-icon">🍳</span><span>Nieuw recept</span>
+        </button>
+        <button class="qa-btn" onclick="window.open('index.html','_blank')">
+          <span class="qa-icon">👁</span><span>Bekijk website</span>
+        </button>
+      </div>
+    </div>`;
+}
 
 // ── Plant raster ──────────────────────────────────────────────
 function renderSection(type) {
-  const plants = allPlants[type] || [];
-  const label  = {kruiden:'Kruiden', groenten:'Groenten', fruit:'Fruit'}[type];
-  const singular = {kruiden:'kruid', groenten:'groente', fruit:'fruitsoort'}[type];
+  const plants  = allPlants[type] || [];
+  const label   = {kruiden:'Kruiden',groenten:'Groenten',fruit:'Fruit'}[type];
+  const singular= {kruiden:'kruid',groenten:'groente',fruit:'fruitsoort'}[type];
   document.getElementById('main-panel').innerHTML = `
-    <div class="panel-header">
-      <div>
-        <h2>${label} <span class="badge">${plants.length}</span></h2>
-        <p class="panel-sub">Klik op een plant om te bewerken, of voeg een nieuwe toe.</p>
-      </div>
+    <div class="page-title-row">
+      <div class="page-title">${label} <span class="badge">${plants.length}</span></div>
       <button class="btn-primary" onclick="openEditor(null,'${type}')">+ Nieuwe ${singular}</button>
     </div>
+    <p class="page-sub">Klik op een plant om te bewerken of voeg een nieuwe toe.</p>
+    <div class="search-row">
+      <input class="search-input" placeholder="🔍 Zoeken op naam…" oninput="filterPlantGrid(this.value,'${type}')">
+    </div>
     <div class="plant-grid" id="plant-grid"></div>`;
+  renderPlantGrid(plants, type);
+}
 
+function renderPlantGrid(plants, type) {
   const grid = document.getElementById('plant-grid');
-  if (!plants.length) {
-    grid.innerHTML = '<p class="empty-msg">Nog geen planten. Klik op "+ Nieuw" om te beginnen.</p>';
-    return;
-  }
-  grid.innerHTML = plants.map(p => `
-    <div class="plant-card">
+  if (!grid) return;
+  if (!plants.length) { grid.innerHTML='<p class="empty-msg">Nog geen planten. Klik op "+ Nieuw" om te beginnen.</p>'; return; }
+  grid.innerHTML = plants.map(p=>`
+    <div class="plant-card" onclick="openEditor('${p.id}','${type}')">
       <div class="pcard-img">
-        ${p.photo
-          ? `<img src="${p.photo}" alt="${p.name}" loading="lazy">`
-          : `<div class="pcard-emoji">${p.emoji||'🌿'}</div>`}
-        <span class="care-dot care-${p.care}" title="${{easy:'Weinig zorg',medium:'Matige zorg',hard:'Veel zorg'}[p.care]||''}"></span>
+        ${p.photo?`<img src="${p.photo}" alt="${p.name}" loading="lazy">`:`<div class="pcard-emoji">${p.emoji||'🌿'}</div>`}
+        <span class="care-dot care-${p.care}"></span>
       </div>
       <div class="pcard-body">
         <div class="pcard-name">${p.name||p.id}</div>
         <div class="pcard-lat">${p.lat||''}</div>
       </div>
       <div class="pcard-actions">
-        <button class="btn-edit" onclick="openEditor('${p.id}','${type}')">✏️ Bewerken</button>
-        <button class="btn-del"  onclick="deletePlant('${p.id}','${type}')">🗑</button>
+        <button class="btn-icon-edit" onclick="event.stopPropagation();openEditor('${p.id}','${type}')">✏️</button>
+        <button class="btn-icon-del" onclick="event.stopPropagation();deletePlant('${p.id}','${type}')">🗑</button>
       </div>
     </div>`).join('');
 }
 
+window.filterPlantGrid = (q, type) => {
+  const filtered = (allPlants[type]||[]).filter(p =>
+    !q || p.name?.toLowerCase().includes(q.toLowerCase()) || p.lat?.toLowerCase().includes(q.toLowerCase()));
+  renderPlantGrid(filtered, type);
+};
+
 // ── Editor ────────────────────────────────────────────────────
 window.openEditor = (id, type) => {
-  editingId = id; editingType = type;
+  editingId=id; editingType=type;
   const p = id ? (allPlants[type]||[]).find(x=>x.id===id)||{} : {};
   document.getElementById('editor-overlay').classList.add('open');
-  document.getElementById('editor-title').textContent =
-    id ? `${p.name||id} bewerken` : `Nieuwe ${type.slice(0,-2).toLowerCase()} toevoegen`;
-
-  const set = (elId, val) => { const el=document.getElementById(elId); if(el) el.value=val??''; };
-  set('ed-id',          p.id||'');
-  set('ed-name',        p.name||'');
-  set('ed-lat',         p.lat||'');
-  set('ed-emoji',       p.emoji||'🌿');
-  set('ed-care',        p.care||'easy');
-  set('ed-sun',         p.sun||'');
-  set('ed-temp',        p.temp||'');
-  set('ed-ph',          p.ph||'');
-  set('ed-soil',        p.soil||'');
-  set('ed-wf',          p.wf||3);
-  set('ed-tip',         p.tip||'');
-  set('ed-oogst_hoe',   p.oogst_hoe||'');
-  set('ed-stek_hoe',    p.stek_hoe||'');
-  set('ed-bewaring',    p.bewaring||'');
-  set('ed-ben',         (p.ben||[]).join('\n'));
-  set('ed-rec',         (p.rec||[]).join('\n'));
-  set('ed-good',        (p.good||[]).join(', '));
-  set('ed-bad',         (p.bad||[]).join(', '));
-  set('ed-cat',         (p.cat||[]).join(', '));
-  set('ed-zaai_binnen', (p.zaai_binnen||[]).join(', '));
-  set('ed-zaai_buiten', (p.zaai_buiten||[]).join(', '));
-  set('ed-uitplanten',  (p.uitplanten||[]).join(', '));
-  set('ed-oogst',       (p.oogst||[]).join(', '));
-  set('ed-stek',        (p.stek||[]).join(', '));
-  set('ed-photo-url',   p.photo||'');
-  set('ed-pests',       JSON.stringify(p.pests||[], null, 2));
-  set('ed-diseases',    JSON.stringify(p.diseases||[], null, 2));
-  document.getElementById('ed-id').disabled = !!id;
-
-  const prev = document.getElementById('photo-preview');
-  prev.innerHTML = p.photo
-    ? `<img src="${p.photo}" style="max-height:130px;border-radius:8px;object-fit:cover">`
-    : '<span class="no-photo">Geen foto</span>';
-
-  switchEtab('basis', document.querySelector('.etab'));
+  document.getElementById('editor-title').textContent = id ? `${p.name||id} bewerken` : `Nieuwe ${type?.slice(0,-2)||''} toevoegen`;
+  const set=(elId,val)=>{const el=document.getElementById(elId);if(el)el.value=val??'';};
+  set('ed-id',p.id||''); set('ed-name',p.name||''); set('ed-lat',p.lat||'');
+  set('ed-emoji',p.emoji||'🌿'); set('ed-care',p.care||'easy');
+  set('ed-sun',p.sun||''); set('ed-temp',p.temp||''); set('ed-ph',p.ph||'');
+  set('ed-soil',p.soil||''); set('ed-wf',p.wf||3); set('ed-tip',p.tip||'');
+  set('ed-oogst_hoe',p.oogst_hoe||''); set('ed-stek_hoe',p.stek_hoe||'');
+  set('ed-bewaring',p.bewaring||''); set('ed-ben',(p.ben||[]).join('\n'));
+  set('ed-rec',(p.rec||[]).join('\n')); set('ed-good',(p.good||[]).join(', '));
+  set('ed-bad',(p.bad||[]).join(', ')); set('ed-cat',(p.cat||[]).join(', '));
+  set('ed-zaai_binnen',(p.zaai_binnen||[]).join(', ')); set('ed-zaai_buiten',(p.zaai_buiten||[]).join(', '));
+  set('ed-uitplanten',(p.uitplanten||[]).join(', ')); set('ed-oogst',(p.oogst||[]).join(', '));
+  set('ed-stek',(p.stek||[]).join(', ')); set('ed-photo-url',p.photo||'');
+  set('ed-pests',JSON.stringify(p.pests||[],null,2)); set('ed-diseases',JSON.stringify(p.diseases||[],null,2));
+  document.getElementById('ed-id').disabled=!!id;
+  document.getElementById('photo-preview').innerHTML=p.photo
+    ?`<img src="${p.photo}" style="max-height:130px;border-radius:8px;object-fit:cover">`
+    :'<span class="no-photo">Geen foto</span>';
+  switchEtab('basis',document.querySelector('.etab'));
 };
-
-window.closeEditor = () => {
-  document.getElementById('editor-overlay').classList.remove('open');
-  editingId = null; editingType = null;
-};
+window.closeEditor=()=>{document.getElementById('editor-overlay').classList.remove('open');editingId=null;editingType=null;};
 
 window.savePlant = async () => {
-  const get = id => (document.getElementById(id)||{}).value||'';
-  const id  = get('ed-id').trim().toLowerCase().replace(/\s+/g,'-');
-  if (!id) { toast('Vul een ID in.','err'); return; }
-
-  const months = s => s.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)&&n>=1&&n<=12);
-  const lines  = s => s.split('\n').map(x=>x.trim()).filter(Boolean);
-  const csv    = s => s.split(',').map(x=>x.trim()).filter(Boolean);
-  let pests=[], diseases=[];
-  try { pests    = JSON.parse(get('ed-pests')||'[]'); }    catch(e){}
-  try { diseases = JSON.parse(get('ed-diseases')||'[]'); } catch(e){}
-
-  const data = {
-    id, name:get('ed-name'), lat:get('ed-lat'), emoji:get('ed-emoji'),
-    care:get('ed-care'), sun:get('ed-sun'), temp:get('ed-temp'),
-    ph:get('ed-ph'), soil:get('ed-soil'), wf:parseInt(get('ed-wf'))||3,
-    tip:get('ed-tip'), oogst_hoe:get('ed-oogst_hoe'), stek_hoe:get('ed-stek_hoe'),
-    bewaring:get('ed-bewaring'),
-    ben:lines(get('ed-ben')), rec:lines(get('ed-rec')),
-    good:csv(get('ed-good')), bad:csv(get('ed-bad')), cat:csv(get('ed-cat')),
-    zaai_binnen:months(get('ed-zaai_binnen')), zaai_buiten:months(get('ed-zaai_buiten')),
-    uitplanten:months(get('ed-uitplanten')), oogst:months(get('ed-oogst')), stek:months(get('ed-stek')),
-    photo:get('ed-photo-url'), pests, diseases,
-    ph_stages:['🌱','🌿','🌸','🌼'], cp:0, watered:Date.now()
-  };
-
-  try {
-    await setDoc(doc(db, editingType, id), data);
-    const idx = (allPlants[editingType]||[]).findIndex(p=>p.id===id);
-    if (idx>=0) allPlants[editingType][idx]=data; else allPlants[editingType].push(data);
-    renderSection(editingType);
-    closeEditor();
-    toast(`${data.name||id} opgeslagen ✓`,'ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
+  const get=id=>(document.getElementById(id)||{}).value||'';
+  const id=get('ed-id').trim().toLowerCase().replace(/\s+/g,'-');
+  if(!id){toast('Vul een ID in.','err');return;}
+  const months=s=>s.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)&&n>=1&&n<=12);
+  const lines=s=>s.split('\n').map(x=>x.trim()).filter(Boolean);
+  const csv=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
+  let pests=[],diseases=[];
+  try{pests=JSON.parse(get('ed-pests')||'[]');}catch(e){}
+  try{diseases=JSON.parse(get('ed-diseases')||'[]');}catch(e){}
+  const data={id,name:get('ed-name'),lat:get('ed-lat'),emoji:get('ed-emoji'),care:get('ed-care'),
+    sun:get('ed-sun'),temp:get('ed-temp'),ph:get('ed-ph'),soil:get('ed-soil'),wf:parseInt(get('ed-wf'))||3,
+    tip:get('ed-tip'),oogst_hoe:get('ed-oogst_hoe'),stek_hoe:get('ed-stek_hoe'),bewaring:get('ed-bewaring'),
+    ben:lines(get('ed-ben')),rec:lines(get('ed-rec')),good:csv(get('ed-good')),bad:csv(get('ed-bad')),cat:csv(get('ed-cat')),
+    zaai_binnen:months(get('ed-zaai_binnen')),zaai_buiten:months(get('ed-zaai_buiten')),
+    uitplanten:months(get('ed-uitplanten')),oogst:months(get('ed-oogst')),stek:months(get('ed-stek')),
+    photo:get('ed-photo-url'),pests,diseases,ph_stages:['🌱','🌿','🌸','🌼'],cp:0,watered:Date.now()};
+  try{
+    await setDoc(doc(db,editingType,id),data);
+    const idx=(allPlants[editingType]||[]).findIndex(p=>p.id===id);
+    if(idx>=0)allPlants[editingType][idx]=data;else allPlants[editingType].push(data);
+    renderSection(editingType);closeEditor();toast(`${data.name||id} opgeslagen ✓`,'ok');
+  }catch(e){toast('Fout: '+e.message,'err');}
 };
 
-window.deletePlant = async (id, type) => {
-  const p = (allPlants[type]||[]).find(x=>x.id===id);
-  if (!confirm(`"${p?.name||id}" permanent verwijderen?`)) return;
-  try {
-    await deleteDoc(doc(db, type, id));
-    allPlants[type] = (allPlants[type]||[]).filter(x=>x.id!==id);
-    renderSection(type);
-    toast(`${p?.name||id} verwijderd`,'ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
+window.deletePlant=async(id,type)=>{
+  const p=(allPlants[type]||[]).find(x=>x.id===id);
+  if(!confirm(`"${p?.name||id}" permanent verwijderen?`))return;
+  try{await deleteDoc(doc(db,type,id));allPlants[type]=(allPlants[type]||[]).filter(x=>x.id!==id);renderSection(type);toast(`Verwijderd`,'ok');}
+  catch(e){toast('Fout: '+e.message,'err');}
 };
 
-// ── Foto zoeken via Unsplash (gratis, geen Storage nodig) ────
-window.searchUnsplash = async () => {
-  const query = document.getElementById('ed-name').value.trim()
-             || document.getElementById('ed-id').value.trim()
-             || 'plant herb';
-  const results = document.getElementById('unsplash-results');
-  results.innerHTML = '<span style="color:var(--text2);font-size:.8rem">Zoeken…</span>';
-
-  // Gebruik Unsplash source API — geen API key nodig
-  const suggestions = [
+window.searchUnsplash=async()=>{
+  const query=document.getElementById('ed-name').value.trim()||document.getElementById('ed-id').value.trim()||'plant herb';
+  const results=document.getElementById('unsplash-results');
+  results.innerHTML='<span style="color:var(--text-muted);font-size:.8rem">Zoeken…</span>';
+  const suggestions=[
     `https://source.unsplash.com/480x320/?${encodeURIComponent(query)},plant`,
     `https://source.unsplash.com/480x320/?${encodeURIComponent(query)},herb,garden`,
     `https://source.unsplash.com/480x320/?${encodeURIComponent(query)},nature,green`,
     `https://source.unsplash.com/480x320/?${encodeURIComponent(query)},food,fresh`,
   ];
-
-  results.innerHTML = suggestions.map((url, i) => `
+  results.innerHTML=suggestions.map((url,i)=>`
     <div class="unsplash-thumb" onclick="selectPhoto('${url}')">
-      <img src="${url}&sig=${Date.now()+i}" alt="optie ${i+1}"
-        onerror="this.parentElement.style.display='none'">
+      <img src="${url}&sig=${Date.now()+i}" alt="optie ${i+1}" onerror="this.parentElement.style.display='none'">
       <div class="unsplash-pick">✓ Kiezen</div>
     </div>`).join('');
 };
-
-window.selectPhoto = (url) => {
-  document.getElementById('ed-photo-url').value = url;
-  document.getElementById('photo-preview').innerHTML =
-    `<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover">`;
-  document.getElementById('unsplash-results').innerHTML =
-    '<span style="color:var(--accent);font-size:.8rem">✓ Foto geselecteerd</span>';
+window.selectPhoto=url=>{
+  document.getElementById('ed-photo-url').value=url;
+  document.getElementById('photo-preview').innerHTML=`<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover">`;
+  document.getElementById('unsplash-results').innerHTML='<span style="color:var(--green);font-size:.8rem">✓ Foto geselecteerd</span>';
+};
+window.previewPhotoUrl=()=>{
+  const url=document.getElementById('ed-photo-url').value.trim();
+  document.getElementById('photo-preview').innerHTML=url
+    ?`<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover" onerror="this.parentElement.innerHTML='<span class=no-photo>URL niet geldig</span>'">`
+    :'<span class="no-photo">Geen foto</span>';
 };
 
-window.previewPhotoUrl = () => {
-  const url = document.getElementById('ed-photo-url').value.trim();
-  document.getElementById('photo-preview').innerHTML = url
-    ? `<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover"
-         onerror="this.parentElement.innerHTML='<span class=no-photo>URL niet geldig</span>'">`
-    : '<span class="no-photo">Geen foto</span>';
+// ══════════════════════════════════════════════════════════════
+//  PAGE BUILDER
+// ══════════════════════════════════════════════════════════════
+
+const BLOCK_TYPES = [
+  { id:'hero',    icon:'🖼',  label:'Hero banner',      desc:'Grote foto met tekst overlay' },
+  { id:'text',    icon:'📝',  label:'Tekstblok',        desc:'Vrije tekst, titels, alinea\'s' },
+  { id:'image',   icon:'🌄',  label:'Afbeelding',       desc:'Foto met optioneel bijschrift' },
+  { id:'cols2',   icon:'⬛⬛', label:'2 kolommen',       desc:'Tekst en foto naast elkaar' },
+  { id:'cols3',   icon:'⬛⬛⬛',label:'3 kolommen',      desc:'Drie gelijke kolommen' },
+  { id:'cta',     icon:'🔘',  label:'Call-to-action',   desc:'Knop met achtergrond' },
+  { id:'cards',   icon:'🗂',  label:'Kaarten rij',      desc:'3 kaarten met icoon + tekst' },
+  { id:'spacer',  icon:'↕️',  label:'Ruimte',           desc:'Lege ruimte / scheiding' },
+  { id:'divider', icon:'━',   label:'Lijn',             desc:'Horizontale scheidingslijn' },
+  { id:'gallery', icon:'🖼🖼', label:'Galerij',         desc:'Fotogrid (2-4 foto\'s)' },
+];
+
+async function loadPages() {
+  try {
+    const snap = await getDocs(collection(db,'pages'));
+    pages = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ pages=[]; }
+}
+
+function renderPageManager() {
+  document.getElementById('main-panel').innerHTML = `
+    <div class="page-title-row">
+      <div class="page-title">Pagina's <span class="badge">${pages.length}</span></div>
+      <button class="btn-primary" onclick="openPageEditor(null)">+ Nieuwe pagina</button>
+    </div>
+    <p class="page-sub">Beheer alle pagina's van jouw website. Klik op een pagina om de inhoud te bewerken.</p>
+    ${pages.length === 0 ? `
+      <div class="empty-state">
+        <div class="empty-icon">📄</div>
+        <h3>Nog geen pagina's</h3>
+        <p>Maak je eerste pagina aan om te beginnen met bouwen.</p>
+        <button class="btn-primary" onclick="openPageEditor(null)" style="margin-top:1rem">+ Eerste pagina aanmaken</button>
+      </div>` : `
+    <div class="pages-list" id="pages-list">
+      ${pages.map(pg => `
+        <div class="page-row">
+          <div class="page-row-left">
+            <div class="page-row-icon">📄</div>
+            <div>
+              <div class="page-row-title">${pg.title||'Naamloos'}</div>
+              <div class="page-row-slug">/${pg.slug||pg.id} · ${(pg.blocks||[]).length} blokken</div>
+            </div>
+          </div>
+          <div class="page-row-actions">
+            <span class="status-badge ${pg.published?'published':'draft'}">${pg.published?'Gepubliceerd':'Concept'}</span>
+            <button class="btn-outline-sm" onclick="openPageEditor('${pg.id}')">✏️ Bewerken</button>
+            <button class="btn-outline-sm danger" onclick="deletePage('${pg.id}')">🗑</button>
+          </div>
+        </div>`).join('')}
+    </div>`}`;
+}
+
+window.openPageEditor = (id) => {
+  activePage = id ? pages.find(p=>p.id===id) : null;
+  if (!activePage && id) return;
+  if (!activePage) {
+    activePage = { id:'page_'+Date.now(), title:'Nieuwe pagina', slug:'nieuwe-pagina', blocks:[], published:false };
+  }
+  renderPageBuilderUI();
 };
+
+window.deletePage = async (id) => {
+  if (!confirm('Pagina permanent verwijderen?')) return;
+  try {
+    await deleteDoc(doc(db,'pages',id));
+    pages = pages.filter(p=>p.id!==id);
+    renderPageManager();
+    toast('Pagina verwijderd','ok');
+  } catch(e){ toast('Fout: '+e.message,'err'); }
+};
+
+function renderPageBuilderUI() {
+  document.getElementById('main-panel').innerHTML = `
+    <div class="pb-header">
+      <div class="pb-header-left">
+        <button class="btn-back" onclick="saveActivePage(true)">← Terug</button>
+        <div>
+          <input class="pb-title-input" id="pb-page-title" value="${activePage.title||''}" placeholder="Paginatitel">
+          <input class="pb-slug-input" id="pb-page-slug" value="${activePage.slug||''}" placeholder="url-slug">
+        </div>
+      </div>
+      <div class="pb-header-right">
+        <label class="toggle-label">
+          <input type="checkbox" id="pb-published" ${activePage.published?'checked':''}>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          Gepubliceerd
+        </label>
+        <button class="btn-outline-sm" onclick="previewPage()">👁 Voorbeeld</button>
+        <button class="btn-primary" onclick="saveActivePage(false)">💾 Opslaan</button>
+      </div>
+    </div>
+    <div class="pb-layout">
+      <!-- Block palette -->
+      <div class="pb-palette">
+        <div class="pb-palette-title">Blokken</div>
+        <div class="pb-palette-list">
+          ${BLOCK_TYPES.map(b=>`
+            <div class="palette-item" draggable="true"
+              ondragstart="paletteDragStart(event,'${b.id}')"
+              onclick="addBlock('${b.id}')">
+              <span class="palette-icon">${b.icon}</span>
+              <div class="palette-info">
+                <div class="palette-label">${b.label}</div>
+                <div class="palette-desc">${b.desc}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <!-- Canvas -->
+      <div class="pb-canvas" id="pb-canvas"
+        ondragover="canvasDragOver(event)"
+        ondrop="canvasDrop(event)">
+        <div class="pb-canvas-inner" id="pb-canvas-inner">
+          ${activePage.blocks && activePage.blocks.length > 0
+            ? activePage.blocks.map((b,i)=>renderBlockCard(b,i)).join('')
+            : `<div class="canvas-empty" id="canvas-empty">
+                <div class="canvas-empty-icon">🧩</div>
+                <p>Sleep blokken hierheen of klik op een blok in het paneel links</p>
+              </div>`}
+        </div>
+      </div>
+      <!-- Properties panel -->
+      <div class="pb-props" id="pb-props">
+        <div class="pb-props-title">Eigenschappen</div>
+        <div class="pb-props-content" id="pb-props-content">
+          <p class="props-placeholder">Klik op een blok om de eigenschappen te bewerken.</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderBlockCard(block, idx) {
+  const bt = BLOCK_TYPES.find(b=>b.id===block.type)||{icon:'📦',label:'Blok'};
+  const preview = getBlockPreview(block);
+  return `<div class="pb-block" id="block-${idx}" data-idx="${idx}" draggable="true"
+      ondragstart="blockDragStart(event,${idx})"
+      ondragover="blockDragOver(event)"
+      ondrop="blockDrop(event,${idx})"
+      onclick="selectBlock(${idx})">
+    <div class="pb-block-handle">⠿</div>
+    <div class="pb-block-info">
+      <span class="pb-block-type">${bt.icon} ${bt.label}</span>
+      <span class="pb-block-preview">${preview}</span>
+    </div>
+    <div class="pb-block-actions">
+      <button class="pb-block-btn" onclick="event.stopPropagation();moveBlock(${idx},-1)" title="Omhoog">↑</button>
+      <button class="pb-block-btn" onclick="event.stopPropagation();moveBlock(${idx},1)" title="Omlaag">↓</button>
+      <button class="pb-block-btn danger" onclick="event.stopPropagation();removeBlock(${idx})" title="Verwijderen">🗑</button>
+    </div>
+  </div>`;
+}
+
+function getBlockPreview(block) {
+  if (block.type==='text'||block.type==='hero') return (block.title||block.text||'').substring(0,50)||'(leeg)';
+  if (block.type==='image') return block.src ? '📷 Afbeelding' : '(geen foto)';
+  if (block.type==='cta') return block.btnText||'Call-to-action';
+  if (block.type==='cols2') return `${block.col1Title||'Kolom 1'} | ${block.col2Title||'Kolom 2'}`;
+  if (block.type==='cols3') return `${block.col1||'K1'} | ${block.col2||'K2'} | ${block.col3||'K3'}`;
+  if (block.type==='cards') return `${(block.cards||[]).length} kaarten`;
+  if (block.type==='gallery') return `${(block.images||[]).length} foto\'s`;
+  if (block.type==='spacer') return `${block.height||40}px ruimte`;
+  return '';
+}
+
+window.addBlock = (type) => {
+  const block = createDefaultBlock(type);
+  if (!activePage.blocks) activePage.blocks=[];
+  activePage.blocks.push(block);
+  refreshCanvas();
+  selectBlock(activePage.blocks.length-1);
+};
+
+function createDefaultBlock(type) {
+  const defaults = {
+    hero:    { type:'hero',    title:'Welkom bij HerbalRoot', subtitle:'Kweek je eigen kruidentuin', bgColor:'#162016', textColor:'#e8d5a3', btnText:'Aan de slag', btnLink:'#', bgImage:'' },
+    text:    { type:'text',    title:'', text:'Schrijf hier je tekst...', align:'left', size:'normal' },
+    image:   { type:'image',   src:'', alt:'', caption:'', width:'full', radius:8 },
+    cols2:   { type:'cols2',   col1Title:'Titel kolom 1', col1Text:'Tekst hier...', col2Src:'', col2Alt:'', reverse:false },
+    cols3:   { type:'cols3',   col1:'Kolom 1', col2:'Kolom 2', col3:'Kolom 3', col1text:'', col2text:'', col3text:'', col1icon:'🌱', col2icon:'🌿', col3icon:'🌸' },
+    cta:     { type:'cta',     title:'Klaar om te beginnen?', subtitle:'', btnText:'Aan de slag', btnLink:'#', bgColor:'#7ec87e', textColor:'#0f1a0f' },
+    cards:   { type:'cards',   cards:[{icon:'🌱',title:'Kaart 1',text:'Beschrijving'},{icon:'🌿',title:'Kaart 2',text:'Beschrijving'},{icon:'🌸',title:'Kaart 3',text:'Beschrijving'}] },
+    spacer:  { type:'spacer',  height:40 },
+    divider: { type:'divider', color:'#2a3d2a', thickness:1, margin:20 },
+    gallery: { type:'gallery', images:[], cols:3, gap:8, radius:8 },
+  };
+  return defaults[type] || { type };
+}
+
+window.removeBlock=(idx)=>{
+  if(!confirm('Blok verwijderen?'))return;
+  activePage.blocks.splice(idx,1);
+  refreshCanvas();
+  document.getElementById('pb-props-content').innerHTML='<p class="props-placeholder">Klik op een blok om de eigenschappen te bewerken.</p>';
+};
+
+window.moveBlock=(idx,dir)=>{
+  const to=idx+dir;
+  if(to<0||to>=activePage.blocks.length)return;
+  [activePage.blocks[idx],activePage.blocks[to]]=[activePage.blocks[to],activePage.blocks[idx]];
+  refreshCanvas();
+  selectBlock(to);
+};
+
+function refreshCanvas() {
+  const inner = document.getElementById('pb-canvas-inner');
+  if (!inner) return;
+  if (!activePage.blocks||!activePage.blocks.length) {
+    inner.innerHTML=`<div class="canvas-empty" id="canvas-empty"><div class="canvas-empty-icon">🧩</div><p>Sleep blokken hierheen of klik op een blok in het paneel links</p></div>`;
+    return;
+  }
+  inner.innerHTML = activePage.blocks.map((b,i)=>renderBlockCard(b,i)).join('');
+}
+
+let selectedBlockIdx = null;
+window.selectBlock = (idx) => {
+  selectedBlockIdx = idx;
+  document.querySelectorAll('.pb-block').forEach((el,i)=>el.classList.toggle('selected',i===idx));
+  const block = activePage.blocks[idx];
+  if (!block) return;
+  renderBlockProps(block, idx);
+};
+
+function renderBlockProps(block, idx) {
+  const c = document.getElementById('pb-props-content');
+  if (!c) return;
+  const bt = BLOCK_TYPES.find(b=>b.id===block.type)||{label:'Blok'};
+  let html = `<div class="props-block-title">${bt.icon||''} ${bt.label}</div>`;
+
+  if (block.type==='hero') {
+    html += propField('Titel','pb-title','text',block.title)
+      + propField('Subtitel','pb-subtitle','text',block.subtitle)
+      + propField('Achtergrondafbeelding URL','pb-bgImage','text',block.bgImage)
+      + propColorField('Achtergrondkleur','pb-bgColor',block.bgColor)
+      + propColorField('Tekstkleur','pb-textColor',block.textColor)
+      + propField('Knooptekst','pb-btnText','text',block.btnText)
+      + propField('Knoop link','pb-btnLink','text',block.btnLink);
+  } else if (block.type==='text') {
+    html += propField('Titel','pb-title','text',block.title)
+      + propTextarea('Tekst','pb-text',block.text)
+      + propSelect('Uitlijning','pb-align',['left','center','right'],block.align)
+      + propSelect('Grootte','pb-size',['small','normal','large'],block.size);
+  } else if (block.type==='image') {
+    html += propField('Foto URL','pb-src','text',block.src)
+      + propField('Alt tekst','pb-alt','text',block.alt)
+      + propField('Bijschrift','pb-caption','text',block.caption)
+      + propSelect('Breedte','pb-width',['full','wide','medium','small'],block.width)
+      + propField('Afgeronde hoeken (px)','pb-radius','number',block.radius);
+  } else if (block.type==='cols2') {
+    html += propField('Linker kolom titel','pb-col1Title','text',block.col1Title)
+      + propTextarea('Linker kolom tekst','pb-col1Text',block.col1Text)
+      + propField('Rechter foto URL','pb-col2Src','text',block.col2Src)
+      + propField('Foto alt tekst','pb-col2Alt','text',block.col2Alt)
+      + `<label class="prop-check"><input type="checkbox" id="pb-reverse" ${block.reverse?'checked':''}> Foto links, tekst rechts</label>`;
+  } else if (block.type==='cols3') {
+    html += [1,2,3].map(n=>`
+      <div class="props-group">Kolom ${n}</div>
+      ${propField('Icoon','pb-col'+n+'icon','text',block['col'+n+'icon']||'')}
+      ${propField('Titel','pb-col'+n,'text',block['col'+n]||'')}
+      ${propTextarea('Tekst','pb-col'+n+'text',block['col'+n+'text']||'')}`).join('');
+  } else if (block.type==='cta') {
+    html += propField('Titel','pb-title','text',block.title)
+      + propField('Ondertitel','pb-subtitle','text',block.subtitle)
+      + propField('Knooptekst','pb-btnText','text',block.btnText)
+      + propField('Knoop link','pb-btnLink','text',block.btnLink)
+      + propColorField('Achtergrondkleur','pb-bgColor',block.bgColor)
+      + propColorField('Tekstkleur','pb-textColor',block.textColor);
+  } else if (block.type==='cards') {
+    html += '<div class="props-group">Kaarten</div>';
+    (block.cards||[]).forEach((card,ci)=>{
+      html+=`<div class="card-prop-group">
+        ${propField('Icoon','pb-card-icon-'+ci,'text',card.icon)}
+        ${propField('Titel','pb-card-title-'+ci,'text',card.title)}
+        ${propTextarea('Tekst','pb-card-text-'+ci,card.text)}
+        <button class="btn-danger-sm" onclick="removeCard(${ci})">🗑 Kaart verwijderen</button>
+      </div>`;
+    });
+    html += `<button class="btn-outline-sm" style="width:100%;margin-top:.5rem" onclick="addCard()">+ Kaart toevoegen</button>`;
+  } else if (block.type==='gallery') {
+    html += '<div class="props-group">Foto\'s (één URL per regel)</div>';
+    html += propTextarea('Foto URL\'s','pb-gallery-urls',(block.images||[]).join('\n'));
+    html += propField('Kolommen','pb-cols','number',block.cols||3);
+    html += propField('Tussenruimte (px)','pb-gap','number',block.gap||8);
+    html += propField('Afgeronde hoeken (px)','pb-radius','number',block.radius||8);
+  } else if (block.type==='spacer') {
+    html += propField('Hoogte (px)','pb-height','number',block.height||40);
+  } else if (block.type==='divider') {
+    html += propColorField('Kleur','pb-color',block.color)
+      + propField('Dikte (px)','pb-thickness','number',block.thickness||1)
+      + propField('Marge (px)','pb-margin','number',block.margin||20);
+  }
+
+  html += `<button class="btn-primary" style="width:100%;margin-top:1rem" onclick="applyBlockProps(${idx})">✓ Toepassen</button>`;
+  c.innerHTML = html;
+}
+
+function propField(label,id,type,val){
+  return `<div class="prop-field"><label class="prop-label">${label}</label><input type="${type}" id="${id}" value="${(val??'').toString().replace(/"/g,'&quot;')}" class="prop-input"></div>`;
+}
+function propTextarea(label,id,val){
+  return `<div class="prop-field"><label class="prop-label">${label}</label><textarea id="${id}" class="prop-textarea" rows="4">${val??''}</textarea></div>`;
+}
+function propSelect(label,id,opts,val){
+  return `<div class="prop-field"><label class="prop-label">${label}</label><select id="${id}" class="prop-input">${opts.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select></div>`;
+}
+function propColorField(label,id,val){
+  return `<div class="prop-field prop-color-row"><label class="prop-label">${label}</label><div class="prop-color-wrap"><input type="color" id="${id}-color" value="${val||'#000000'}" oninput="document.getElementById('${id}').value=this.value"><input type="text" id="${id}" value="${val||''}" class="prop-input prop-input-color" oninput="try{document.getElementById('${id}-color').value=this.value}catch(e){}"></div></div>`;
+}
+
+window.applyBlockProps = (idx) => {
+  const block = activePage.blocks[idx];
+  if (!block) return;
+  const getVal = id => { const el=document.getElementById(id); return el ? (el.type==='checkbox'?el.checked:el.value) : undefined; };
+
+  if (block.type==='hero') {
+    block.title=getVal('pb-title')||''; block.subtitle=getVal('pb-subtitle')||'';
+    block.bgImage=getVal('pb-bgImage')||''; block.bgColor=getVal('pb-bgColor')||'#162016';
+    block.textColor=getVal('pb-textColor')||'#e8d5a3'; block.btnText=getVal('pb-btnText')||'';
+    block.btnLink=getVal('pb-btnLink')||'#';
+  } else if (block.type==='text') {
+    block.title=getVal('pb-title')||''; block.text=getVal('pb-text')||'';
+    block.align=getVal('pb-align')||'left'; block.size=getVal('pb-size')||'normal';
+  } else if (block.type==='image') {
+    block.src=getVal('pb-src')||''; block.alt=getVal('pb-alt')||'';
+    block.caption=getVal('pb-caption')||''; block.width=getVal('pb-width')||'full';
+    block.radius=parseInt(getVal('pb-radius'))||8;
+  } else if (block.type==='cols2') {
+    block.col1Title=getVal('pb-col1Title')||''; block.col1Text=getVal('pb-col1Text')||'';
+    block.col2Src=getVal('pb-col2Src')||''; block.col2Alt=getVal('pb-col2Alt')||'';
+    block.reverse=!!getVal('pb-reverse');
+  } else if (block.type==='cols3') {
+    [1,2,3].forEach(n=>{block['col'+n]=getVal('pb-col'+n)||'';block['col'+n+'text']=getVal('pb-col'+n+'text')||'';block['col'+n+'icon']=getVal('pb-col'+n+'icon')||'';});
+  } else if (block.type==='cta') {
+    block.title=getVal('pb-title')||''; block.subtitle=getVal('pb-subtitle')||'';
+    block.btnText=getVal('pb-btnText')||''; block.btnLink=getVal('pb-btnLink')||'#';
+    block.bgColor=getVal('pb-bgColor')||'#7ec87e'; block.textColor=getVal('pb-textColor')||'#0f1a0f';
+  } else if (block.type==='cards') {
+    (block.cards||[]).forEach((card,ci)=>{
+      card.icon=getVal('pb-card-icon-'+ci)||''; card.title=getVal('pb-card-title-'+ci)||'';
+      card.text=getVal('pb-card-text-'+ci)||'';
+    });
+  } else if (block.type==='gallery') {
+    block.images=(getVal('pb-gallery-urls')||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    block.cols=parseInt(getVal('pb-cols'))||3; block.gap=parseInt(getVal('pb-gap'))||8;
+    block.radius=parseInt(getVal('pb-radius'))||8;
+  } else if (block.type==='spacer') {
+    block.height=parseInt(getVal('pb-height'))||40;
+  } else if (block.type==='divider') {
+    block.color=getVal('pb-color')||'#2a3d2a'; block.thickness=parseInt(getVal('pb-thickness'))||1;
+    block.margin=parseInt(getVal('pb-margin'))||20;
+  }
+
+  refreshCanvas();
+  selectBlock(idx);
+  toast('Blok bijgewerkt ✓','ok');
+};
+
+window.addCard=()=>{
+  const block=activePage.blocks[selectedBlockIdx];
+  if(block&&block.type==='cards'){
+    if(!block.cards)block.cards=[];
+    block.cards.push({icon:'⭐',title:'Nieuw',text:'Beschrijving'});
+    renderBlockProps(block,selectedBlockIdx);
+  }
+};
+window.removeCard=ci=>{
+  const block=activePage.blocks[selectedBlockIdx];
+  if(block&&block.type==='cards'){block.cards.splice(ci,1);renderBlockProps(block,selectedBlockIdx);}
+};
+
+// Drag-and-drop palette → canvas
+window.paletteDragStart=(e,type)=>{ e.dataTransfer.setData('palette',type); dragSrc='palette'; };
+window.canvasDragOver=e=>{e.preventDefault();};
+window.canvasDrop=e=>{
+  e.preventDefault();
+  const type=e.dataTransfer.getData('palette');
+  if(dragSrc==='palette'&&type){addBlock(type);dragSrc=null;}
+};
+
+// Drag-and-drop reorder blocks
+window.blockDragStart=(e,idx)=>{e.dataTransfer.setData('blockIdx',idx);dragSrc='block';e.stopPropagation();};
+window.blockDragOver=e=>{e.preventDefault();e.stopPropagation();};
+window.blockDrop=(e,toIdx)=>{
+  e.preventDefault();e.stopPropagation();
+  if(dragSrc!=='block')return;
+  const fromIdx=parseInt(e.dataTransfer.getData('blockIdx'));
+  if(isNaN(fromIdx)||fromIdx===toIdx)return;
+  const [moved]=activePage.blocks.splice(fromIdx,1);
+  activePage.blocks.splice(toIdx,0,moved);
+  refreshCanvas();
+  selectBlock(toIdx);
+  dragSrc=null;
+};
+
+window.saveActivePage = async (goBack) => {
+  activePage.title = (document.getElementById('pb-page-title')?.value||activePage.title).trim();
+  activePage.slug  = (document.getElementById('pb-page-slug')?.value||activePage.slug).trim().toLowerCase().replace(/\s+/g,'-');
+  activePage.published = document.getElementById('pb-published')?.checked||false;
+  try {
+    await setDoc(doc(db,'pages',activePage.id), activePage);
+    const idx=pages.findIndex(p=>p.id===activePage.id);
+    if(idx>=0)pages[idx]=activePage;else pages.push(activePage);
+    toast('Pagina opgeslagen ✓','ok');
+    if(goBack){activePage=null;switchSection('paginas');}
+  } catch(e){ toast('Fout: '+e.message,'err'); }
+};
+
+window.previewPage = () => {
+  const win = window.open('','_blank');
+  win.document.write(generatePageHTML(activePage));
+  win.document.close();
+};
+
+function generatePageHTML(pg) {
+  const blocks = (pg.blocks||[]).map(renderBlockHTML).join('\n');
+  return `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${pg.title||'Pagina'}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:#0f1a0f;color:#e8f0e8;}
+img{max-width:100%;display:block;}
+.container{max-width:1100px;margin:0 auto;padding:0 1.5rem;}
+</style></head><body>${blocks}</body></html>`;
+}
+
+function renderBlockHTML(block) {
+  switch(block.type) {
+    case 'hero':
+      return `<div style="min-height:420px;background:${block.bgImage?`url('${block.bgImage}') center/cover`:block.bgColor||'#162016'};display:flex;align-items:center;justify-content:center;text-align:center;padding:3rem 1.5rem;">
+        <div><h1 style="font-family:'Playfair Display',serif;color:${block.textColor||'#e8d5a3'};font-size:clamp(2rem,5vw,3.5rem);margin-bottom:1rem">${block.title||''}</h1>
+        <p style="color:${block.textColor||'#e8f0e8'};opacity:.8;font-size:1.1rem;margin-bottom:1.5rem">${block.subtitle||''}</p>
+        ${block.btnText?`<a href="${block.btnLink||'#'}" style="display:inline-block;padding:.85rem 2rem;background:#7ec87e;color:#0f1a0f;border-radius:100px;text-decoration:none;font-weight:500">${block.btnText}</a>`:''}</div></div>`;
+    case 'text':
+      const sz={small:'.9rem',normal:'1rem',large:'1.15rem'}[block.size]||'1rem';
+      return `<div class="container" style="padding-top:2.5rem;padding-bottom:2.5rem;text-align:${block.align||'left'}">
+        ${block.title?`<h2 style="font-family:'Playfair Display',serif;color:#e8d5a3;margin-bottom:1rem;font-size:1.8rem">${block.title}</h2>`:''}
+        <p style="color:#9ab09a;line-height:1.75;font-size:${sz}">${(block.text||'').replace(/\n/g,'<br>')}</p></div>`;
+    case 'image':
+      const wmap={full:'100%',wide:'85%',medium:'60%',small:'40%'};
+      return `<div style="text-align:center;padding:1.5rem">
+        <img src="${block.src||''}" alt="${block.alt||''}" style="width:${wmap[block.width]||'100%'};border-radius:${block.radius||8}px;margin:0 auto">
+        ${block.caption?`<p style="color:#9ab09a;font-size:.85rem;margin-top:.5rem">${block.caption}</p>`:''}</div>`;
+    case 'cols2':
+      const cols=block.reverse
+        ?`<div style="flex:1"><img src="${block.col2Src||''}" alt="${block.col2Alt||''}" style="width:100%;border-radius:10px"></div><div style="flex:1;padding:1rem"><h3 style="font-family:'Playfair Display',serif;color:#e8d5a3;margin-bottom:.75rem">${block.col1Title||''}</h3><p style="color:#9ab09a;line-height:1.75">${(block.col1Text||'').replace(/\n/g,'<br>')}</p></div>`
+        :`<div style="flex:1;padding:1rem"><h3 style="font-family:'Playfair Display',serif;color:#e8d5a3;margin-bottom:.75rem">${block.col1Title||''}</h3><p style="color:#9ab09a;line-height:1.75">${(block.col1Text||'').replace(/\n/g,'<br>')}</p></div><div style="flex:1"><img src="${block.col2Src||''}" alt="${block.col2Alt||''}" style="width:100%;border-radius:10px"></div>`;
+      return `<div class="container" style="padding-top:2.5rem;padding-bottom:2.5rem"><div style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap">${cols}</div></div>`;
+    case 'cols3':
+      return `<div class="container" style="padding-top:2.5rem;padding-bottom:2.5rem"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem">
+        ${[1,2,3].map(n=>`<div style="text-align:center;padding:1.5rem;background:#162016;border-radius:12px"><div style="font-size:2.5rem;margin-bottom:.75rem">${block['col'+n+'icon']||''}</div><h3 style="font-family:'Playfair Display',serif;color:#e8d5a3;margin-bottom:.5rem">${block['col'+n]||''}</h3><p style="color:#9ab09a;font-size:.9rem;line-height:1.65">${block['col'+n+'text']||''}</p></div>`).join('')}</div></div>`;
+    case 'cta':
+      return `<div style="background:${block.bgColor||'#7ec87e'};padding:3rem 1.5rem;text-align:center">
+        <h2 style="font-family:'Playfair Display',serif;color:${block.textColor||'#0f1a0f'};font-size:1.9rem;margin-bottom:.5rem">${block.title||''}</h2>
+        ${block.subtitle?`<p style="color:${block.textColor||'#0f1a0f'};opacity:.75;margin-bottom:1.25rem">${block.subtitle}</p>`:''}
+        <a href="${block.btnLink||'#'}" style="display:inline-block;padding:.85rem 2rem;background:${block.textColor||'#0f1a0f'};color:${block.bgColor||'#7ec87e'};border-radius:100px;text-decoration:none;font-weight:500">${block.btnText||'Klik hier'}</a></div>`;
+    case 'cards':
+      return `<div class="container" style="padding-top:2.5rem;padding-bottom:2.5rem"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.25rem">
+        ${(block.cards||[]).map(c=>`<div style="background:#162016;border:1px solid #2a3d2a;border-radius:12px;padding:1.5rem;text-align:center"><div style="font-size:2.5rem;margin-bottom:.75rem">${c.icon||'⭐'}</div><h3 style="color:#e8d5a3;margin-bottom:.5rem">${c.title||''}</h3><p style="color:#9ab09a;font-size:.85rem;line-height:1.6">${c.text||''}</p></div>`).join('')}</div></div>`;
+    case 'gallery':
+      return `<div class="container" style="padding-top:2rem;padding-bottom:2rem"><div style="display:grid;grid-template-columns:repeat(${block.cols||3},1fr);gap:${block.gap||8}px">
+        ${(block.images||[]).map(src=>`<img src="${src}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:${block.radius||8}px">`).join('')}</div></div>`;
+    case 'spacer':
+      return `<div style="height:${block.height||40}px"></div>`;
+    case 'divider':
+      return `<div style="margin:${block.margin||20}px auto;max-width:1100px;padding:0 1.5rem"><hr style="border:none;border-top:${block.thickness||1}px solid ${block.color||'#2a3d2a'}"></div>`;
+    default:
+      return '';
+  }
+}
 
 // ── Thema ─────────────────────────────────────────────────────
 function renderThema() {
-  const vars = {
-    '--bg':'Achtergrond', '--surface':'Kaart achtergrond',
-    '--surface2':'Invoer achtergrond', '--border':'Randkleur',
-    '--accent':'Hoofdkleur (groen)', '--accent2':'Accentkleur (goud)',
-    '--accent3':'Titelkleur', '--text':'Hoofdtekst',
-    '--text2':'Subtekst', '--danger':'Waarschuwingskleur'
-  };
-  const defaults = {
-    '--bg':'#0f1a0f','--surface':'#162016','--surface2':'#1e2e1e',
-    '--border':'#2a3d2a','--accent':'#7ec87e','--accent2':'#c8a96e',
-    '--accent3':'#e8d5a3','--text':'#e8f0e8','--text2':'#9ab09a','--danger':'#c87e7e'
-  };
-  const cur = {...defaults, ...themeVars};
-  document.getElementById('main-panel').innerHTML = `
-    <div class="panel-header">
-      <div><h2>🎨 Thema & Kleuren</h2>
-        <p class="panel-sub">Wijzigingen worden live getoond en opgeslagen in Firebase.</p></div>
+  const vars = {'--bg':'Achtergrond','--surface':'Kaart achtergrond','--surface2':'Invoer achtergrond','--border':'Randkleur','--accent':'Hoofdkleur (groen)','--accent2':'Accentkleur (goud)','--accent3':'Titelkleur','--text':'Hoofdtekst','--text2':'Subtekst','--danger':'Waarschuwingskleur'};
+  const defaults={'--bg':'#0f1a0f','--surface':'#162016','--surface2':'#1e2e1e','--border':'#2a3d2a','--accent':'#7ec87e','--accent2':'#c8a96e','--accent3':'#e8d5a3','--text':'#e8f0e8','--text2':'#9ab09a','--danger':'#c87e7e'};
+  const cur={...defaults,...themeVars};
+  document.getElementById('main-panel').innerHTML=`
+    <div class="page-title-row">
+      <div class="page-title">🎨 Thema & Kleuren</div>
       <button class="btn-primary" onclick="saveTheme()">💾 Opslaan</button>
     </div>
+    <p class="page-sub">Wijzigingen worden live getoond en opgeslagen.</p>
     <div class="theme-grid">
-      ${Object.entries(vars).map(([v,label]) => `
+      ${Object.entries(vars).map(([v,label])=>`
         <div class="theme-row">
           <div class="theme-label">${label}<span>${v}</span></div>
           <div class="theme-inputs">
-            <input type="color" id="tc${v}" value="${cur[v]||'#000000'}"
-              oninput="liveColor('${v}',this.value)">
-            <input type="text"  id="tt${v}" value="${cur[v]||''}"
-              oninput="liveColor('${v}',this.value)">
+            <input type="color" id="tc${v}" value="${cur[v]||'#000000'}" oninput="liveColor('${v}',this.value)">
+            <input type="text" id="tt${v}" value="${cur[v]||''}" oninput="liveColor('${v}',this.value)">
           </div>
         </div>`).join('')}
     </div>
     <div class="theme-preview">
-      <div style="font-family:'Playfair Display',serif;color:var(--accent3);margin-bottom:.75rem;font-size:1.1rem">Voorbeeldweergave</div>
+      <div style="font-family:'Playfair Display',serif;color:var(--accent3);margin-bottom:.75rem">Voorbeeldweergave</div>
       <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
         <button class="btn-primary" style="pointer-events:none">Knop</button>
         <span class="badge">Badge</span>
@@ -355,744 +854,546 @@ function renderThema() {
       </div>
     </div>`;
 }
-
-window.liveColor = (varName, value) => {
-  document.documentElement.style.setProperty(varName, value);
-  const t = document.getElementById('tt'+varName);
-  const c = document.getElementById('tc'+varName);
-  if (document.activeElement !== t) t.value = value;
-  try { if (document.activeElement !== c) c.value = value; } catch(e){}
+window.liveColor=(varName,value)=>{
+  document.documentElement.style.setProperty(varName,value);
+  const t=document.getElementById('tt'+varName);const c=document.getElementById('tc'+varName);
+  if(document.activeElement!==t)t.value=value;
+  try{if(document.activeElement!==c)c.value=value;}catch(e){}
+};
+window.saveTheme=async()=>{
+  const vars=['--bg','--surface','--surface2','--border','--accent','--accent2','--accent3','--text','--text2','--danger'];
+  const data={};vars.forEach(v=>{const el=document.getElementById('tt'+v);if(el)data[v]=el.value.trim();});
+  try{await setDoc(doc(db,'settings','theme'),data);themeVars=data;toast('Thema opgeslagen ✓','ok');}
+  catch(e){toast('Fout: '+e.message,'err');}
 };
 
-window.saveTheme = async () => {
-  const vars = ['--bg','--surface','--surface2','--border','--accent','--accent2','--accent3','--text','--text2','--danger'];
-  const data = {};
-  vars.forEach(v => { const el=document.getElementById('tt'+v); if(el) data[v]=el.value.trim(); });
-  try {
-    await setDoc(doc(db,'settings','theme'), data);
-    themeVars = data;
-    toast('Thema opgeslagen ✓','ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
-};
-
-// ── Recepten beheren ─────────────────────────────────────────
-let allRecepten = {};  // { naam: { cat, herbId, tijd, ... } }
-let editingRecept = null;
-
-async function loadRecepten() {
-  const snap = await getDocs(collection(db, 'recepten'));
-  allRecepten = {};
-  snap.docs.forEach(d => {
-    const data = d.data();
-    // Gebruik de opgeslagen naam als key, anders het doc-ID
-    const key = data.naam || d.id.replace(/_sl_/g,'/').replace(/_bs_/g,'\\').replace(/_dt_/g,'.').replace(/_/g,' ');
-    allRecepten[key] = data;
-  });
-}
-
+// ── Recepten ──────────────────────────────────────────────────
 function renderRecepten() {
-  const main = document.getElementById('main-panel');
-  const cats = { koken:'🍽 Koken', soep:'🥣 Soepen', drank:'🥤 Dranken', thee:'🍵 Thee', dessert:'🍰 Desserts' };
-  const keys = Object.keys(allRecepten);
-  main.innerHTML = `
-    <div class="panel-header">
-      <div>
-        <h2>🍳 Recepten <span class="badge">${keys.length}</span></h2>
-        <p class="panel-sub">Beheer alle recepten. Klik op een recept om te bewerken.</p>
-      </div>
+  const cats={koken:'🍽 Koken',soep:'🥣 Soepen',drank:'🥤 Dranken',thee:'🍵 Thee',dessert:'🍰 Desserts'};
+  const keys=Object.keys(allRecepten);
+  document.getElementById('main-panel').innerHTML=`
+    <div class="page-title-row">
+      <div class="page-title">🍳 Recepten <span class="badge">${keys.length}</span></div>
       <button class="btn-primary" onclick="openReceptEditor(null)">+ Nieuw recept</button>
     </div>
-    ${keys.length === 0 ? `
-      <div class="import-box">
-        <div class="import-icon">🍳</div>
-        <h3>Nog geen recepten in Firebase</h3>
-        <p>Ga naar <strong>📥 Importeer startdata</strong> en klik op de importeer-knop om alle recepten vanuit de app in Firebase te laden.</p>
-      </div>` : `
-    <div class="recept-filter-bar" id="recept-filter-bar">
-      <button class="rbtn active" onclick="filterReceptAdmin('all',this)">Alles</button>
-      ${Object.entries(cats).map(([k,v])=>`<button class="rbtn" onclick="filterReceptAdmin('${k}',this)">${v}</button>`).join('')}
+    ${keys.length===0?`<div class="empty-state"><div class="empty-icon">🍳</div><h3>Nog geen recepten</h3><p>Importeer startdata of maak een nieuw recept aan.</p></div>`:`
+    <div class="filter-bar" id="recept-filter-bar">
+      <button class="filter-btn active" onclick="filterReceptAdmin('all',this)">Alles</button>
+      ${Object.entries(cats).map(([k,v])=>`<button class="filter-btn" onclick="filterReceptAdmin('${k}',this)">${v}</button>`).join('')}
     </div>
-    <div class="recept-list" id="recept-list"></div>`}`;
-  if (keys.length) renderReceptList('all');
+    <div class="list-container" id="recept-list"></div>`}`;
+  if(keys.length)renderReceptList('all');
 }
-
-let receptFilter = 'all';
-window.filterReceptAdmin = (cat, btn) => {
-  receptFilter = cat;
-  document.querySelectorAll('.rbtn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderReceptList(cat);
-};
-
-function renderReceptList(cat) {
-  const cats = { koken:'🍽', soep:'🥣', drank:'🥤', thee:'🍵', dessert:'🍰' };
-  const entries = Object.entries(allRecepten)
-    .filter(([,v]) => cat === 'all' || v.cat === cat)
-    .sort(([a],[b]) => a.localeCompare(b));
-  document.getElementById('recept-list').innerHTML = entries.map(([naam, r]) => `
-    <div class="recept-row">
-      <div class="recept-row-left">
-        <span class="recept-cat-dot">${cats[r.cat]||'🍴'}</span>
-        <div>
-          <div class="recept-row-name">${naam}</div>
-          <div class="recept-row-meta">${r.herbId||''} · ${r.tijd||''} · ${r.porties||''}</div>
-        </div>
+let receptFilter='all';
+window.filterReceptAdmin=(cat,btn)=>{receptFilter=cat;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderReceptList(cat);};
+function renderReceptList(cat){
+  const cats={koken:'🍽',soep:'🥣',drank:'🥤',thee:'🍵',dessert:'🍰'};
+  const entries=Object.entries(allRecepten).filter(([,v])=>cat==='all'||v.cat===cat).sort(([a],[b])=>a.localeCompare(b));
+  document.getElementById('recept-list').innerHTML=entries.map(([naam,r])=>`
+    <div class="list-row">
+      <div class="list-row-left">
+        <span class="list-icon">${cats[r.cat]||'🍴'}</span>
+        <div><div class="list-row-title">${naam}</div><div class="list-row-meta">${r.herbId||''} · ${r.tijd||''} · ${r.porties||''}</div></div>
       </div>
-      <div class="recept-row-actions">
-        <button class="btn-edit" onclick="openReceptEditor('${naam.replace(/'/g,"\\'")}')">✏️ Bewerken</button>
-        <button class="btn-del" onclick="deleteRecept('${naam.replace(/'/g,"\\'")}')">🗑</button>
+      <div class="list-row-actions">
+        <button class="btn-outline-sm" onclick="openReceptEditor('${naam.replace(/'/g,"\\'")}')">✏️ Bewerken</button>
+        <button class="btn-outline-sm danger" onclick="deleteRecept('${naam.replace(/'/g,"\\'")}')">🗑</button>
       </div>
-    </div>`).join('') || '<p class="empty-msg">Geen recepten in deze categorie.</p>';
+    </div>`).join('')||'<p class="empty-msg">Geen recepten in deze categorie.</p>';
 }
-
-window.openReceptEditor = (naam) => {
-  editingRecept = naam;
-  const r = naam ? (allRecepten[naam] || {}) : {};
+window.openReceptEditor=(naam)=>{
+  editingRecept=naam;const r=naam?(allRecepten[naam]||{}):{};
   document.getElementById('recept-editor-overlay').classList.add('open');
-  document.getElementById('re-title').textContent = naam ? `${naam} bewerken` : 'Nieuw recept';
-  const set = (id, val) => { const el=document.getElementById(id); if(el) el.value=val??''; };
-  set('re-naam',         naam||'');
-  set('re-cat',          r.cat||'koken');
-  set('re-herbid',       r.herbId||'');
-  set('re-tijd',         r.tijd||'');
-  set('re-porties',      r.porties||'');
-  set('re-moeilijk',     r.moeilijk||'⚡ Makkelijk');
-  set('re-intro',        r.intro||'');
-  set('re-ingredienten', (r.ingredienten||[]).join('\n'));
-  set('re-methode',      (r.methode||[]).join('\n'));
-  set('re-tip',          r.tip||'');
-  document.getElementById('re-naam').disabled = !!naam;
+  document.getElementById('re-title').textContent=naam?`${naam} bewerken`:'Nieuw recept';
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val??'';};
+  set('re-naam',naam||'');set('re-cat',r.cat||'koken');set('re-herbid',r.herbId||'');
+  set('re-tijd',r.tijd||'');set('re-porties',r.porties||'');set('re-moeilijk',r.moeilijk||'⚡ Makkelijk');
+  set('re-intro',r.intro||'');set('re-ingredienten',(r.ingredienten||[]).join('\n'));
+  set('re-methode',(r.methode||[]).join('\n'));set('re-tip',r.tip||'');
+  document.getElementById('re-naam').disabled=!!naam;
+};
+window.closeReceptEditor=()=>{document.getElementById('recept-editor-overlay').classList.remove('open');editingRecept=null;};
+window.saveRecept=async()=>{
+  const get=id=>(document.getElementById(id)||{}).value||'';
+  const naam=get('re-naam').trim();if(!naam){toast('Vul een naam in.','err');return;}
+  const safeId=naam.replace(/\//g,'_sl_').replace(/\\/g,'_bs_').replace(/\./g,'_dt_').replace(/\s+/g,'_').substring(0,500);
+  const data={naam,cat:get('re-cat'),herbId:get('re-herbid'),tijd:get('re-tijd'),porties:get('re-porties'),moeilijk:get('re-moeilijk'),intro:get('re-intro'),ingredienten:get('re-ingredienten').split('\n').map(x=>x.trim()).filter(Boolean),methode:get('re-methode').split('\n').map(x=>x.trim()).filter(Boolean),tip:get('re-tip')};
+  try{await setDoc(doc(db,'recepten',safeId),data);allRecepten[naam]=data;closeReceptEditor();renderRecepten();toast(`${naam} opgeslagen ✓`,'ok');}
+  catch(e){toast('Fout: '+e.message,'err');}
+};
+window.deleteRecept=async(naam)=>{
+  if(!confirm(`"${naam}" verwijderen?`))return;
+  const safeId=naam.replace(/\//g,'_sl_').replace(/\\/g,'_bs_').replace(/\./g,'_dt_').replace(/\s+/g,'_').substring(0,500);
+  try{await deleteDoc(doc(db,'recepten',safeId));delete allRecepten[naam];renderRecepten();toast(`${naam} verwijderd`,'ok');}
+  catch(e){toast('Fout: '+e.message,'err');}
 };
 
-window.closeReceptEditor = () => {
-  document.getElementById('recept-editor-overlay').classList.remove('open');
-  editingRecept = null;
-};
-
-window.saveRecept = async () => {
-  const get = id => (document.getElementById(id)||{}).value||'';
-  const naam = get('re-naam').trim();
-  if (!naam) { toast('Vul een naam in.','err'); return; }
-  const safeId = naam.replace(/\//g,'_sl_').replace(/\\/g,'_bs_').replace(/\./g,'_dt_').replace(/\s+/g,'_').substring(0,500);
-  const data = {
-    naam,
-    cat:          get('re-cat'),
-    herbId:       get('re-herbid'),
-    tijd:         get('re-tijd'),
-    porties:      get('re-porties'),
-    moeilijk:     get('re-moeilijk'),
-    intro:        get('re-intro'),
-    ingredienten: get('re-ingredienten').split('\n').map(x=>x.trim()).filter(Boolean),
-    methode:      get('re-methode').split('\n').map(x=>x.trim()).filter(Boolean),
-    tip:          get('re-tip'),
-  };
-  try {
-    await setDoc(doc(db, 'recepten', safeId), data);
-    allRecepten[naam] = data;
-    closeReceptEditor();
-    renderRecepten();
-    toast(`${naam} opgeslagen ✓`, 'ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
-};
-
-window.deleteRecept = async (naam) => {
-  if (!confirm(`"${naam}" verwijderen?`)) return;
-  const safeId = naam.replace(/\//g,'_sl_').replace(/\\/g,'_bs_').replace(/\./g,'_dt_').replace(/\s+/g,'_').substring(0,500);
-  try {
-    await deleteDoc(doc(db, 'recepten', safeId));
-    delete allRecepten[naam];
-    renderRecepten();
-    toast(`${naam} verwijderd`, 'ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
-};
-
-// ── Community beheren ─────────────────────────────────────────
-let allPosts = [];
-
-async function loadCommunity() {
-  const snap = await getDocs(collection(db, 'community'));
-  allPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a,b) => (b.ts||0) - (a.ts||0));
-}
-
-function renderCommunity() {
-  const catLabel = { vraag:'❓ Vraag', tip:'💡 Tip', recept:'🍳 Recept', oogst:'🌾 Oogst' };
-  const catColor = { vraag:'rgba(100,180,230,.15)', tip:'rgba(126,200,126,.15)', recept:'rgba(200,169,110,.15)', oogst:'rgba(240,200,40,.15)' };
-  document.getElementById('main-panel').innerHTML = `
-    <div class="panel-header">
-      <div>
-        <h2>🌿 Community <span class="badge">${allPosts.length}</span></h2>
-        <p class="panel-sub">Modereer berichten. Je kunt berichten vastpinnen, verwijderen of zelf posten.</p>
-      </div>
+// ── Community ──────────────────────────────────────────────────
+function renderCommunity(){
+  const catLabel={vraag:'❓ Vraag',tip:'💡 Tip',recept:'🍳 Recept',oogst:'🌾 Oogst'};
+  document.getElementById('main-panel').innerHTML=`
+    <div class="page-title-row">
+      <div class="page-title">🌿 Community <span class="badge">${allPosts.length}</span></div>
       <button class="btn-primary" onclick="openPostEditor(null)">+ Nieuw bericht</button>
     </div>
-    ${allPosts.length === 0 ? `
-      <div class="import-box">
-        <div class="import-icon">🌿</div>
-        <h3>Nog geen berichten in Firebase</h3>
-        <p>Ga naar <strong>📥 Importeer startdata</strong> om de startberichten in Firebase te laden. Gebruikers kunnen daarna zelf reageren en nieuwe berichten plaatsen.</p>
-      </div>` : `
-    <div class="post-admin-list" id="post-admin-list">
-      ${allPosts.map(p => `
-        <div class="post-admin-card ${p.pinned?'pinned':''}">
-          <div class="post-admin-head">
-            <span class="post-admin-cat" style="background:${catColor[p.cat]||'var(--surface2)'}">
-              ${catLabel[p.cat]||p.cat}
-            </span>
-            ${p.pinned ? '<span class="pin-badge">📌 Vastgepind</span>' : ''}
-            <span class="post-admin-date">${p.date||''}</span>
-            <span class="post-admin-author">— ${p.author||''}</span>
+    ${allPosts.length===0?`<div class="empty-state"><div class="empty-icon">🌿</div><h3>Nog geen berichten</h3><p>Importeer startdata of maak een nieuw bericht aan.</p></div>`:`
+    <div class="list-container">
+      ${allPosts.map(p=>`
+        <div class="list-row post-row ${p.pinned?'pinned':''}">
+          <div class="list-row-left">
+            <span class="list-icon">${catLabel[p.cat]||p.cat}</span>
+            <div>
+              <div class="list-row-title">${p.pinned?'📌 ':''} ${p.title||''}</div>
+              <div class="list-row-meta">${p.author||''} · ${p.date||''} · 💬 ${(p.replies||[]).length} · ❤️ ${p.likes||0}</div>
+            </div>
           </div>
-          <div class="post-admin-title">${p.title||''}</div>
-          <div class="post-admin-body">${p.body||''}</div>
-          <div class="post-admin-replies">
-            💬 ${(p.replies||[]).length} reacties · ❤️ ${p.likes||0} likes
-          </div>
-          <div class="post-admin-actions">
-            <button class="btn-edit" onclick="togglePin('${p.id}',${!p.pinned})">
-              ${p.pinned ? '📌 Losmaken' : '📌 Vastpinnen'}
-            </button>
-            <button class="btn-edit" onclick="openPostEditor('${p.id}')">✏️ Bewerken</button>
-            <button class="btn-del"  onclick="deletePost('${p.id}')">🗑 Verwijderen</button>
+          <div class="list-row-actions">
+            <button class="btn-outline-sm" onclick="togglePin('${p.id}',${!p.pinned})">${p.pinned?'📌 Losmaken':'📌 Pinnen'}</button>
+            <button class="btn-outline-sm" onclick="openPostEditor('${p.id}')">✏️</button>
+            <button class="btn-outline-sm danger" onclick="deletePost('${p.id}')">🗑</button>
           </div>
         </div>`).join('')}
     </div>`}`;
 }
-
-window.togglePin = async (id, pin) => {
-  try {
-    const p = allPosts.find(x=>x.id===id);
-    if (!p) return;
-    await setDoc(doc(db,'community',id), {...p, pinned: pin});
-    p.pinned = pin;
-    renderCommunity();
-    toast(pin ? 'Bericht vastgepind 📌' : 'Bericht losgemaakt', 'ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
+window.togglePin=async(id,pin)=>{try{const p=allPosts.find(x=>x.id===id);if(!p)return;await setDoc(doc(db,'community',id),{...p,pinned:pin});p.pinned=pin;renderCommunity();toast(pin?'Vastgepind 📌':'Losgemaakt','ok');}catch(e){toast('Fout: '+e.message,'err');}};
+window.openPostEditor=(id)=>{const p=id?allPosts.find(x=>x.id===id)||{}:{};document.getElementById('post-editor-overlay').classList.add('open');document.getElementById('pe-title-head').textContent=!id?'Nieuw bericht':'Bericht bewerken';document.getElementById('pe-id').value=id||('post_'+Date.now());document.getElementById('pe-author').value=p.author||'HerbalRoot Team';document.getElementById('pe-cat').value=p.cat||'tip';document.getElementById('pe-title').value=p.title||'';document.getElementById('pe-body').value=p.body||'';};
+window.closePostEditor=()=>{document.getElementById('post-editor-overlay').classList.remove('open');};
+window.savePost=async()=>{
+  const get=id=>(document.getElementById(id)||{}).value||'';const id=get('pe-id');
+  const data={id,author:get('pe-author'),cat:get('pe-cat'),title:get('pe-title'),body:get('pe-body'),date:new Date().toLocaleDateString('nl-BE'),ts:Date.now(),likes:0,replies:[],pinned:false};
+  const existing=allPosts.find(x=>x.id===id);if(existing){data.likes=existing.likes||0;data.replies=existing.replies||[];data.pinned=existing.pinned||false;data.date=existing.date||data.date;}
+  try{await setDoc(doc(db,'community',id),data);if(existing){const i=allPosts.findIndex(x=>x.id===id);allPosts[i]=data;}else{allPosts.unshift(data);}closePostEditor();renderCommunity();toast('Bericht opgeslagen ✓','ok');}
+  catch(e){toast('Fout: '+e.message,'err');}
 };
+window.deletePost=async(id)=>{const p=allPosts.find(x=>x.id===id);if(!confirm(`"${p?.title||id}" verwijderen?`))return;try{await deleteDoc(doc(db,'community',id));allPosts=allPosts.filter(x=>x.id!==id);renderCommunity();toast('Verwijderd','ok');}catch(e){toast('Fout: '+e.message,'err');}};
 
-window.openPostEditor = (id) => {
-  const p = id ? allPosts.find(x=>x.id===id)||{} : {};
-  const isNew = !id;
-  document.getElementById('post-editor-overlay').classList.add('open');
-  document.getElementById('pe-title-head').textContent = isNew ? 'Nieuw bericht' : 'Bericht bewerken';
-  document.getElementById('pe-id').value    = id || ('post_'+Date.now());
-  document.getElementById('pe-author').value = p.author || 'HerbalRoot Team';
-  document.getElementById('pe-cat').value   = p.cat    || 'tip';
-  document.getElementById('pe-title').value = p.title  || '';
-  document.getElementById('pe-body').value  = p.body   || '';
-};
-
-window.closePostEditor = () => {
-  document.getElementById('post-editor-overlay').classList.remove('open');
-};
-
-window.savePost = async () => {
-  const get = id => (document.getElementById(id)||{}).value||'';
-  const id = get('pe-id');
-  const data = {
-    id,
-    author:  get('pe-author'),
-    cat:     get('pe-cat'),
-    title:   get('pe-title'),
-    body:    get('pe-body'),
-    date:    new Date().toLocaleDateString('nl-BE'),
-    ts:      Date.now(),
-    likes:   0,
-    replies: [],
-    pinned:  false,
-  };
-  // Preserve existing likes/replies if editing
-  const existing = allPosts.find(x=>x.id===id);
-  if (existing) {
-    data.likes   = existing.likes   || 0;
-    data.replies = existing.replies || [];
-    data.pinned  = existing.pinned  || false;
-    data.date    = existing.date    || data.date;
-  }
-  try {
-    await setDoc(doc(db,'community',id), data);
-    if (existing) {
-      const idx = allPosts.findIndex(x=>x.id===id);
-      allPosts[idx] = data;
-    } else {
-      allPosts.unshift(data);
-    }
-    closePostEditor();
-    renderCommunity();
-    toast('Bericht opgeslagen ✓','ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
-};
-
-window.deletePost = async (id) => {
-  const p = allPosts.find(x=>x.id===id);
-  if (!confirm(`"${p?.title||id}" verwijderen?`)) return;
-  try {
-    await deleteDoc(doc(db,'community',id));
-    allPosts = allPosts.filter(x=>x.id!==id);
-    renderCommunity();
-    toast('Bericht verwijderd','ok');
-  } catch(e) { toast('Fout: '+e.message,'err'); }
-};
-
-// ── Import startdata ──────────────────────────────────────────
-function renderImport() {
-  document.getElementById('main-panel').innerHTML = `
-    <div class="panel-header">
-      <div>
-        <h2>📥 Importeer startdata</h2>
-        <p class="panel-sub">Laad alle bestaande planten uit de app naar Firebase — doe dit eenmalig.</p>
-      </div>
+// ── Import ─────────────────────────────────────────────────────
+function renderImport(){
+  document.getElementById('main-panel').innerHTML=`
+    <div class="page-title-row">
+      <div class="page-title">📥 Importeer startdata</div>
     </div>
+    <p class="page-sub">Laad alle bestaande planten uit de app naar Firebase — doe dit eenmalig.</p>
     <div class="import-box">
       <div class="import-icon">🌿</div>
       <h3>Eénmalige import</h3>
-      <p>De app bevat <strong>44 kruiden</strong>, <strong>16 groenten</strong> en <strong>10 fruitsoorten</strong> die momenteel hard-coded in de app staan.</p>
-      <p>Met deze knop worden ze allemaal in Firebase opgeslagen. Daarna kun je ze via dit dashboard bewerken en worden wijzigingen live in de app getoond.</p>
-      <div class="import-warning">⚠️ Bestaande planten in Firebase met hetzelfde ID worden overschreven.</div>
-      <button class="btn-primary" style="margin-top:1.25rem;padding:.85rem 2rem;font-size:.95rem"
-        id="import-btn" onclick="importAllPlants()">
-        🚀 Importeer alle planten naar Firebase
-      </button>
+      <p>De app bevat <strong>44 kruiden</strong>, <strong>16 groenten</strong> en <strong>10 fruitsoorten</strong>.</p>
+      <p>Met deze knop worden ze allemaal in Firebase opgeslagen. Daarna kun je ze via dit dashboard bewerken.</p>
+      <div class="import-warning">⚠️ Bestaande planten met hetzelfde ID worden overschreven.</div>
+      <button class="btn-primary" style="margin-top:1.25rem;padding:.85rem 2rem" id="import-btn" onclick="importAllPlants()">🚀 Importeer alle planten naar Firebase</button>
       <div id="import-progress" style="margin-top:1.25rem"></div>
     </div>`;
 }
 
-window.importAllPlants = async () => {
-  const btn = document.getElementById('import-btn');
-  const progress = document.getElementById('import-progress');
-  btn.disabled = true;
-  btn.textContent = '⏳ Bezig met laden…';
-
-  try {
-    // Fetch index.html en extraheer de plantdata
-    progress.innerHTML = '<div class="prog-line">📄 index.html ophalen…</div>';
-    const res  = await fetch('./index.html');
-    const html = await res.text();
-
-    // Extraheer de drie arrays als tekst
-    progress.innerHTML += '<div class="prog-line">🔍 Plantdata analyseren…</div>';
-
-    function extractArray(html, startMarker, endMarker) {
-      const start = html.indexOf(startMarker);
-      const end   = html.indexOf(endMarker, start);
-      if (start === -1 || end === -1) return [];
-      let raw = html.slice(start + startMarker.length, end).trim();
-      // Verwijder trailing comma
-      raw = raw.replace(/,\s*$/, '');
-      // Zet elke plant-entry om naar een JSON-veilig object
-      const plants = [];
-      // Gebruik Function() om de JS-array te evalueren — veilig want eigen code
-      try {
-        const arr = new Function(`
-          const now = ${Date.now()};
-          return [${raw}];
-        `)();
-        arr.forEach(p => {
-          if (!p || !p.id) return;
-          // Maak het object JSON-serialiseerbaar
-          const clean = {};
-          Object.keys(p).forEach(k => {
-            const v = p[k];
-            if (typeof v === 'function') return;
-            if (typeof v === 'number' && !isFinite(v)) return;
-            clean[k] = v;
-          });
-          clean.watered = Date.now();
-          plants.push(clean);
-        });
-      } catch(e) {
-        console.error('Parse error:', e);
-      }
-      return plants;
+window.importAllPlants=async()=>{
+  const btn=document.getElementById('import-btn');const progress=document.getElementById('import-progress');
+  btn.disabled=true;btn.textContent='⏳ Bezig…';
+  try{
+    progress.innerHTML='<div class="prog-line">📄 index.html ophalen…</div>';
+    const res=await fetch('./index.html');const html=await res.text();
+    progress.innerHTML+='<div class="prog-line">🔍 Data analyseren…</div>';
+    function extractArray(html,start,end){const s=html.indexOf(start);const e=html.indexOf(end,s);if(s===-1||e===-1)return[];let raw=html.slice(s+start.length,e).trim().replace(/,\s*$/,'');try{return new Function(`const now=${Date.now()};return [${raw}];`)().filter(p=>p&&p.id).map(p=>{const c={};Object.keys(p).forEach(k=>{const v=p[k];if(typeof v!=='function'&&(typeof v!=='number'||isFinite(v)))c[k]=v;});c.watered=Date.now();return c;});}catch(e){console.error('Parse error:',e);return[];}}
+    const herbs=extractArray(html,'const HERBS=[','const GROENTEN');
+    const groenten=extractArray(html,'const GROENTEN = [','const FRUIT');
+    const fruit=extractArray(html,'const FRUIT = [','// ═══════════════════════════════════════════════════════════════\n// GROENTEN & FRUIT STATE');
+    progress.innerHTML+=`<div class="prog-line">✅ ${herbs.length} kruiden, ${groenten.length} groenten, ${fruit.length} fruit gevonden</div>`;
+    let totalOk=0,totalErr=0;
+    for(const cat of [{name:'kruiden',data:herbs,label:'kruiden'},{name:'groenten',data:groenten,label:'groenten'},{name:'fruit',data:fruit,label:'fruitsoorten'}]){
+      progress.innerHTML+=`<div class="prog-line">📤 ${cat.data.length} ${cat.label} uploaden…</div>`;
+      let ok=0,err=0;
+      for(const plant of cat.data){try{await setDoc(doc(db,cat.name,plant.id),plant);ok++;}catch(e){err++;}}
+      totalOk+=ok;totalErr+=err;
+      progress.innerHTML+=`<div class="prog-line prog-ok">✓ ${ok} ${cat.label} opgeslagen${err?` (${err} fouten)`:''}</div>`;
+      allPlants[cat.name]=cat.data;
     }
-
-    const herbs    = extractArray(html, 'const HERBS=[',       'const GROENTEN');
-    const groenten = extractArray(html, 'const GROENTEN = [',  'const FRUIT');
-    const fruit    = extractArray(html, 'const FRUIT = [',     '// ═══════════════════════════════════════════════════════════════\n// GROENTEN & FRUIT STATE');
-
-    progress.innerHTML += `<div class="prog-line">✅ Gevonden: ${herbs.length} kruiden, ${groenten.length} groenten, ${fruit.length} fruit</div>`;
-
-    // Upload naar Firestore per categorie
-    const categories = [
-      { name: 'kruiden',   data: herbs,    label: 'kruiden' },
-      { name: 'groenten',  data: groenten, label: 'groenten' },
-      { name: 'fruit',     data: fruit,    label: 'fruitsoorten' },
-    ];
-
-    let totalOk = 0, totalErr = 0;
-
-    for (const cat of categories) {
-      progress.innerHTML += `<div class="prog-line">📤 ${cat.data.length} ${cat.label} uploaden…</div>`;
-      let ok = 0, err = 0;
-      for (const plant of cat.data) {
-        try {
-          await setDoc(doc(db, cat.name, plant.id), plant);
-          ok++;
-        } catch(e) {
-          err++;
-          console.error('Fout bij', plant.id, e);
-        }
-      }
-      totalOk  += ok;
-      totalErr += err;
-      progress.innerHTML += `<div class="prog-line prog-ok">✓ ${ok} ${cat.label} opgeslagen${err ? ` (${err} fouten)` : ''}</div>`;
-      allPlants[cat.name] = cat.data;
-    }
-
-    // Recepten importeren
-    progress.innerHTML += `<div class="prog-line">📤 Recepten importeren…</div>`;
-    try {
-      // Zoek RECEPTEN_DB — gebruik veilige markers
-      const receptStart = html.indexOf('const RECEPTEN_DB = {');
-      const receptEnd   = html.indexOf('// ═══════════════════════════════════════\n// GEOLOCATION', receptStart);
-
-      if (receptStart === -1) throw new Error('RECEPTEN_DB niet gevonden in index.html');
-      if (receptEnd   === -1) throw new Error('Einde van RECEPTEN_DB niet gevonden — marker mismatch');
-
-      const receptRaw = html.slice(receptStart, receptEnd).trim();
-      const receptObj = new Function(receptRaw + '\nreturn RECEPTEN_DB;')();
-      const entries   = Object.entries(receptObj);
-      progress.innerHTML += `<div class="prog-line">🔍 ${entries.length} recepten gevonden…</div>`;
-
-      let receptOk = 0, receptErr = 0;
-      for (const [naam, data] of entries) {
-        // Firestore staat geen /, \, ., .., of speciale chars toe in doc IDs
-        // Gebruik een veilige ID: encode speciale tekens
-        const safeId = naam
-          .replace(/\//g, '_sl_')
-          .replace(/\\/g, '_bs_')
-          .replace(/\./g, '_dt_')
-          .replace(/\s+/g, '_')
-          .substring(0, 500); // max 500 chars
-        try {
-          // Sla de originele naam op als veld zodat we hem kunnen terugvinden
-          await setDoc(doc(db, 'recepten', safeId), { ...data, naam });
-          allRecepten[naam] = { ...data, naam };
-          receptOk++;
-        } catch(e) {
-          console.error('Recept fout:', naam, e.message);
-          receptErr++;
-          totalErr++;
-        }
-      }
-      totalOk += receptOk;
-      progress.innerHTML += `<div class="prog-line prog-ok">✓ ${receptOk} recepten opgeslagen${receptErr ? ` · ${receptErr} fouten` : ''}</div>`;
-    } catch(e) {
-      progress.innerHTML += `<div class="prog-line prog-err">⚠️ Recepten mislukt: ${e.message}</div>`;
-    }
-
-    // Community seed posts importeren
-    progress.innerHTML += `<div class="prog-line">📤 Community startberichten importeren…</div>`;
-    const seedPosts = [
-      { id:'p1', author:'HerbalRoot Team', avatar:'', cat:'tip',
-        title:'Welkom bij de HerbalRoot Community! 🌿',
-        body:'Dit is jouw plek om vragen te stellen, tips te delen en ervaringen uit te wisselen over het kweken van kruiden. Stel gerust vragen — wij helpen elkaar!',
-        date: new Date().toLocaleDateString('nl-BE'), ts: Date.now()-3000, likes:3, replies:[], pinned:true },
-      { id:'p2', author:'Sofie V.', avatar:'', cat:'vraag',
-        title:'Mijn basilicum laat de blaadjes hangen — wat doe ik fout?',
-        body:'Ik heb mijn basilicum op het zuiden staan maar de blaadjes worden slap. Ik geef elke dag water. Hoe kan dit?',
-        date: new Date().toLocaleDateString('nl-BE'), ts: Date.now()-2000, likes:2,
-        replies:[{ author:'Jan D.', avatar:'', body:'Te veel water! Basilicum wil NIET elke dag water — geef alleen water als de bovenste centimeter grond droog is.', date: new Date().toLocaleDateString('nl-BE') }],
-        pinned:false },
-      { id:'p3', author:'Marie L.', avatar:'', cat:'oogst',
-        title:'Eerste oogst lavendel — zo trots! 💜',
-        body:'Na 2 jaar eindelijk mijn eerste echte oogst lavendel. Heb er lavendelsachetjes van gemaakt voor in de kast. De geur is fantastisch!',
-        date: new Date().toLocaleDateString('nl-BE'), ts: Date.now()-1000, likes:7, replies:[], pinned:false },
-    ];
-    let postOk = 0;
-    for (const post of seedPosts) {
-      try {
-        await setDoc(doc(db,'community',post.id), post);
-        postOk++;
-      } catch(e) { totalErr++; }
-    }
-    allPosts = seedPosts;
-    totalOk += postOk;
-    progress.innerHTML += `<div class="prog-line prog-ok">✓ ${postOk} startberichten opgeslagen</div>`;
-
-    // Klaar
-    progress.innerHTML += `
-      <div class="prog-done">
-        🎉 Import klaar! <strong>${totalOk} planten</strong> staan nu in Firebase.
-        ${totalErr ? `<br><span style="color:var(--danger)">${totalErr} planten konden niet worden opgeslagen.</span>` : ''}
-        <br><br>Ga naar Kruiden, Groenten of Fruit om ze te bewerken.
-      </div>`;
-    btn.textContent = '✅ Import voltooid';
-
-  } catch(e) {
-    progress.innerHTML += `<div class="prog-err">❌ Fout: ${e.message}</div>`;
-    btn.disabled = false;
-    btn.textContent = '🚀 Opnieuw proberen';
-  }
+    progress.innerHTML+=`<div class="prog-done">🎉 Import klaar! <strong>${totalOk} items</strong> staan nu in Firebase.${totalErr?`<br><span style="color:var(--danger)">${totalErr} fouten.</span>`:''}</div>`;
+    btn.textContent='✅ Import voltooid';
+  }catch(e){progress.innerHTML+=`<div class="prog-err">❌ Fout: ${e.message}</div>`;btn.disabled=false;btn.textContent='🚀 Opnieuw proberen';}
 };
 
-// ── Toast ─────────────────────────────────────────────────────
-function toast(msg, type='ok') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `toast show toast-${type}`;
-  clearTimeout(el._t);
-  el._t = setTimeout(()=>el.classList.remove('show'), 3000);
+// ── Toast ──────────────────────────────────────────────────────
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast');el.textContent=msg;
+  el.className=`toast show toast-${type}`;clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove('show'),3000);
 }
-window.showToast = toast;
+window.showToast=toast;
 </script>
 
 <style>
+/* ══════════════════ DESIGN TOKENS (one.com inspired) ══════════════════ */
 :root{
-  --bg:#0f1a0f;--surface:#162016;--surface2:#1e2e1e;--border:#2a3d2a;
-  --accent:#7ec87e;--accent2:#c8a96e;--accent3:#e8d5a3;
-  --text:#e8f0e8;--text2:#9ab09a;--danger:#c87e7e;
-  --sidebar:230px;--radius:12px;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  --bg:#f4f5f7; --surface:#ffffff; --surface2:#f9fafb;
+  --border:#e5e7eb; --border2:#d1d5db;
+  --text:#111827; --text-muted:#6b7280; --text-light:#9ca3af;
+  --green:#16a34a; --green-light:#dcfce7; --green-dark:#15803d;
+  --blue:#2563eb; --blue-light:#eff6ff;
+  --red:#dc2626; --red-light:#fef2f2;
+  --yellow:#d97706;
+  --sidebar-w:220px; --topbar-h:56px;
+  --radius:8px; --radius-lg:12px;
+  --shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);
+  --shadow-lg:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -2px rgba(0,0,0,.05);
 
-/* ── Config warning ── */
+  /* HerbalRoot theme vars passthrough */
+  --hr-bg:#0f1a0f; --hr-surface:#162016; --hr-accent:#7ec87e;
+  --hr-accent2:#c8a96e; --hr-accent3:#e8d5a3;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:.875rem;line-height:1.5;}
+
+/* ══ Config / Login ══════════════════════════════════════════════ */
 #config-warning{display:none;position:fixed;inset:0;z-index:999;background:var(--bg);
   flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;}
-.config-box{background:var(--surface);border:1px solid var(--accent2);border-radius:16px;
-  padding:2.5rem;max-width:560px;width:100%;}
-.config-box h2{font-family:'Playfair Display',serif;color:var(--accent3);margin-bottom:.75rem;}
-.config-box p{color:var(--text2);font-size:.9rem;line-height:1.7;margin-bottom:.75rem;}
-.config-box code{background:var(--surface2);padding:.15rem .4rem;border-radius:4px;
-  color:var(--accent2);font-size:.82rem;}
-.config-box a{color:var(--accent);text-decoration:none;}
-.config-box a:hover{text-decoration:underline;}
+.config-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:2.5rem;max-width:520px;width:100%;box-shadow:var(--shadow-lg);}
+.config-box h2{font-size:1.25rem;font-weight:600;color:var(--text);margin-bottom:.75rem;}
+.config-box p{color:var(--text-muted);font-size:.875rem;line-height:1.7;margin-bottom:.5rem;}
 
-/* ── Login ── */
-#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;}
-.login-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;
-  padding:2.5rem;max-width:380px;width:100%;text-align:center;}
-.login-logo{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--accent);margin-bottom:.2rem;}
-.login-logo span{color:var(--accent3);font-style:italic;}
-.login-sub{color:var(--text2);font-size:.82rem;margin-bottom:2rem;}
-.btn-google{display:flex;align-items:center;justify-content:center;gap:.75rem;width:100%;
-  padding:.85rem;background:#fff;color:#1f1f1f;border:none;border-radius:10px;
-  font-family:'DM Sans',sans-serif;font-size:.95rem;font-weight:500;cursor:pointer;transition:all .2s;}
-.btn-google:hover{background:#f0f0f0;transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.2);}
-.btn-google:disabled{opacity:.6;cursor:not-allowed;transform:none;}
-.google-icon{width:20px;height:20px;}
-.login-err{color:var(--danger);font-size:.8rem;margin-top:.75rem;min-height:1.1rem;line-height:1.5;}
-.login-help{margin-top:1.25rem;font-size:.75rem;color:var(--text2);}
-.login-help a{color:var(--accent);text-decoration:none;}
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;
+  background:linear-gradient(135deg,#0f1a0f 0%,#162016 50%,#1e2e1e 100%);padding:1rem;}
+.login-box{background:#fff;border-radius:var(--radius-lg);padding:2.5rem;max-width:360px;width:100%;
+  box-shadow:var(--shadow-lg);text-align:center;}
+.login-logo{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-bottom:.25rem;}
+.login-logo-icon{font-size:1.6rem;}
+.login-logo-text{font-family:'Playfair Display',serif;font-size:1.5rem;color:#16a34a;}
+.login-logo-text span{color:#c8a96e;font-style:italic;}
+.login-sub{color:var(--text-muted);font-size:.8rem;margin-bottom:2rem;}
+.btn-google{display:flex;align-items:center;justify-content:center;gap:.65rem;width:100%;
+  padding:.75rem 1rem;background:#fff;color:#374151;border:1px solid #d1d5db;border-radius:var(--radius);
+  font-family:'Inter',sans-serif;font-size:.875rem;font-weight:500;cursor:pointer;transition:all .15s;box-shadow:var(--shadow);}
+.btn-google:hover{background:#f9fafb;border-color:#9ca3af;box-shadow:var(--shadow-md);}
+.btn-google:disabled{opacity:.55;cursor:not-allowed;}
+.google-icon{width:18px;height:18px;flex-shrink:0;}
+.login-err{color:var(--red);font-size:.78rem;margin-top:.6rem;min-height:1rem;}
+.login-help{margin-top:1rem;font-size:.72rem;color:var(--text-muted);}
+.login-help a{color:var(--green);text-decoration:none;}
 
-/* ── App layout ── */
-#app-screen{display:none;min-height:100vh;}
-.sidebar{width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;}
-.sidebar-logo{padding:1.25rem 1rem 1rem;border-bottom:1px solid var(--border);}
-.sidebar-logo .logo-text{font-family:'Playfair Display',serif;font-size:1.15rem;color:var(--accent);}
-.sidebar-logo .logo-text span{color:var(--accent3);font-style:italic;}
-.sidebar-logo .logo-sub{font-size:.65rem;color:var(--text2);margin-top:.1rem;}
-.sidebar-nav{flex:1;padding:.5rem 0;overflow-y:auto;}
-.nav-label{font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;
-  color:var(--text2);padding:.6rem .9rem .2rem;}
-.nav-item{display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;
-  cursor:pointer;font-size:.85rem;color:var(--text2);transition:all .2s;
-  border-left:3px solid transparent;}
-.nav-item:hover{color:var(--text);background:var(--surface2);}
-.nav-item.active{color:var(--accent);background:rgba(126,200,126,.08);border-left-color:var(--accent);}
-.sidebar-user{padding:.9rem 1rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:.6rem;}
-#user-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;display:none;}
-.user-avatar-fallback{width:30px;height:30px;border-radius:50%;background:var(--surface2);
-  display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;}
-.user-info-text{flex:1;min-width:0;}
-.user-info-name{font-size:.78rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.user-info-email{font-size:.65rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.btn-logout{background:none;border:none;color:var(--text2);cursor:pointer;font-size:.9rem;
-  padding:.2rem;flex-shrink:0;transition:color .2s;}
-.btn-logout:hover{color:var(--danger);}
+/* ══ Layout ══════════════════════════════════════════════════════ */
+#app-screen{display:none;min-height:100vh;flex-direction:row;}
 
-.main-content{margin-left:var(--sidebar);padding:2rem;min-height:100vh;}
+/* Sidebar */
+.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);
+  position:fixed;top:0;left:0;bottom:0;z-index:100;display:flex;flex-direction:column;overflow-y:auto;}
+.sidebar-logo{padding:1rem 1rem .75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;}
+.logo-icon{font-size:1.4rem;}
+.logo-text{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--green);}
+.logo-text span{color:var(--hr-accent2);font-style:italic;}
+.logo-sub{font-size:.6rem;color:var(--text-muted);margin-top:.1rem;}
+.sidebar-nav{flex:1;padding:.5rem 0;}
+.nav-section{padding:.6rem .75rem .2rem;font-size:.65rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;}
+.nav-item{display:flex;align-items:center;gap:.55rem;padding:.5rem .75rem;cursor:pointer;font-size:.82rem;
+  color:var(--text-muted);border-radius:6px;margin:1px .5rem;transition:all .15s;}
+.nav-item:hover{background:var(--bg);color:var(--text);}
+.nav-item.active{background:var(--green-light);color:var(--green-dark);font-weight:500;}
+.nav-item .nav-icon{width:16px;text-align:center;flex-shrink:0;}
+.sidebar-footer{padding:.75rem;border-top:1px solid var(--border);}
+.user-card{display:flex;align-items:center;gap:.6rem;padding:.5rem .4rem;}
+#user-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;display:none;}
+.user-avatar-fallback{width:28px;height:28px;border-radius:50%;background:var(--green-light);
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;color:var(--green);}
+.user-info{flex:1;min-width:0;}
+.user-name{font-size:.78rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-email{font-size:.65rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.btn-logout{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:.2rem;font-size:.9rem;transition:color .15s;flex-shrink:0;}
+.btn-logout:hover{color:var(--red);}
 
-/* ── Panel header ── */
-.panel-header{display:flex;justify-content:space-between;align-items:flex-start;
-  margin-bottom:1.5rem;gap:1rem;flex-wrap:wrap;}
-.panel-header h2{font-family:'Playfair Display',serif;font-size:1.55rem;color:var(--accent3);}
-.panel-sub{color:var(--text2);font-size:.83rem;margin-top:.2rem;}
-.badge{display:inline-block;background:var(--surface2);border:1px solid var(--border);
-  color:var(--text2);border-radius:100px;padding:.1rem .55rem;font-size:.72rem;margin-left:.4rem;}
-.empty-msg{color:var(--text2);padding:2rem 0;font-size:.9rem;}
+/* Main content */
+.main-content{margin-left:var(--sidebar-w);min-height:100vh;padding:1.75rem 2rem;}
 
-/* ── Buttons ── */
-.btn-primary{background:var(--accent);color:#0f1a0f;border:none;border-radius:100px;
-  padding:.7rem 1.4rem;font-family:'DM Sans',sans-serif;font-weight:500;font-size:.88rem;
-  cursor:pointer;transition:all .2s;white-space:nowrap;}
-.btn-primary:hover{background:#9ed89e;transform:translateY(-1px);}
+/* ══ Topbar / Page header ════════════════════════════════════════ */
+.page-title{font-size:1.25rem;font-weight:600;color:var(--text);}
+.page-title-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.4rem;flex-wrap:wrap;}
+.page-sub{color:var(--text-muted);font-size:.82rem;margin-bottom:1.25rem;}
 
-/* ── Plant grid ── */
-.plant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:1rem;}
-.plant-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;transition:border .2s;}
-.plant-card:hover{border-color:var(--accent);}
-.pcard-img{height:110px;overflow:hidden;background:var(--surface2);display:flex;
-  align-items:center;justify-content:center;position:relative;}
+/* ══ Buttons ═════════════════════════════════════════════════════ */
+.btn-primary{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;background:var(--green);
+  color:#fff;border:none;border-radius:var(--radius);font-family:'Inter',sans-serif;font-weight:500;
+  font-size:.82rem;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-primary:hover{background:var(--green-dark);transform:translateY(-1px);box-shadow:var(--shadow);}
+.btn-outline-sm{display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;
+  background:transparent;border:1px solid var(--border2);color:var(--text-muted);
+  border-radius:6px;font-size:.77rem;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-outline-sm:hover{border-color:var(--green);color:var(--green);background:var(--green-light);}
+.btn-outline-sm.danger:hover{border-color:var(--red);color:var(--red);background:var(--red-light);}
+.btn-back{display:inline-flex;align-items:center;gap:.35rem;padding:.4rem .75rem;
+  background:transparent;border:1px solid var(--border);color:var(--text-muted);
+  border-radius:var(--radius);font-size:.8rem;cursor:pointer;transition:all .15s;}
+.btn-back:hover{border-color:var(--text-muted);color:var(--text);}
+.btn-danger-sm{padding:.3rem .6rem;background:var(--red-light);border:1px solid rgba(220,38,38,.3);
+  color:var(--red);border-radius:5px;font-size:.72rem;cursor:pointer;margin-top:.25rem;}
+
+/* ══ Badges & Tags ═══════════════════════════════════════════════ */
+.badge{display:inline-block;background:var(--bg);border:1px solid var(--border);
+  color:var(--text-muted);border-radius:100px;padding:.1rem .5rem;font-size:.7rem;margin-left:.4rem;}
+.status-badge{display:inline-block;padding:.2rem .6rem;border-radius:100px;font-size:.7rem;font-weight:500;}
+.status-badge.published{background:var(--green-light);color:var(--green-dark);}
+.status-badge.draft{background:var(--bg);border:1px solid var(--border);color:var(--text-muted);}
+
+/* ══ Dashboard ═══════════════════════════════════════════════════ */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1rem;margin-bottom:2rem;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:1.25rem 1rem;cursor:pointer;transition:all .15s;text-align:center;}
+.stat-card:hover{border-color:var(--green);box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.stat-icon{font-size:1.75rem;margin-bottom:.5rem;}
+.stat-num{font-size:1.6rem;font-weight:700;color:var(--text);}
+.stat-label{font-size:.75rem;color:var(--text-muted);margin-top:.15rem;}
+.dash-section-title{font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:.75rem;}
+.quick-actions{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.6rem;}
+.qa-btn{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:.8rem;
+  color:var(--text-muted);transition:all .15s;text-align:left;}
+.qa-btn:hover{border-color:var(--green);color:var(--green);background:var(--green-light);}
+.qa-icon{font-size:1rem;flex-shrink:0;}
+
+/* ══ Plant grid ══════════════════════════════════════════════════ */
+.search-row{margin-bottom:1rem;}
+.search-input{width:100%;max-width:340px;padding:.5rem .85rem;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);font-size:.82rem;color:var(--text);outline:none;}
+.search-input:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.1);}
+.plant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.85rem;}
+.plant-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  overflow:hidden;cursor:pointer;transition:all .15s;}
+.plant-card:hover{border-color:var(--green);box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.pcard-img{height:100px;overflow:hidden;background:#f3f4f6;display:flex;align-items:center;justify-content:center;position:relative;}
 .pcard-img img{width:100%;height:100%;object-fit:cover;}
-.pcard-emoji{font-size:2.8rem;}
-.care-dot{position:absolute;top:8px;right:8px;width:10px;height:10px;border-radius:50%;}
-.care-easy{background:#7ec87e;}.care-medium{background:#c8a96e;}.care-hard{background:#c87e7e;}
-.pcard-body{padding:.6rem .85rem .4rem;}
-.pcard-name{font-size:.88rem;font-weight:500;color:var(--text);}
-.pcard-lat{font-size:.7rem;color:var(--text2);font-style:italic;margin-top:.1rem;}
-.pcard-actions{display:flex;gap:.4rem;padding:.4rem .6rem .65rem;}
-.btn-edit{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text2);
-  border-radius:7px;padding:.4rem;font-size:.75rem;cursor:pointer;transition:all .2s;}
-.btn-edit:hover{border-color:var(--accent);color:var(--accent);}
-.btn-del{background:transparent;border:1px solid var(--border);color:var(--text2);
-  border-radius:7px;padding:.4rem .55rem;font-size:.78rem;cursor:pointer;transition:all .2s;}
-.btn-del:hover{border-color:var(--danger);color:var(--danger);}
+.pcard-emoji{font-size:2.6rem;}
+.care-dot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;border:1.5px solid #fff;}
+.care-easy{background:#16a34a;}.care-medium{background:#d97706;}.care-hard{background:#dc2626;}
+.pcard-body{padding:.6rem .75rem .4rem;}
+.pcard-name{font-size:.83rem;font-weight:600;color:var(--text);}
+.pcard-lat{font-size:.67rem;color:var(--text-muted);font-style:italic;margin-top:.1rem;}
+.pcard-actions{display:flex;gap:.3rem;padding:.35rem .5rem .6rem;}
+.btn-icon-edit,.btn-icon-del{flex:1;padding:.3rem;border-radius:5px;border:1px solid var(--border);
+  background:transparent;color:var(--text-muted);cursor:pointer;font-size:.8rem;transition:all .15s;}
+.btn-icon-edit:hover{border-color:var(--green);color:var(--green);background:var(--green-light);}
+.btn-icon-del:hover{border-color:var(--red);color:var(--red);background:var(--red-light);}
+.empty-msg{color:var(--text-muted);padding:2rem 0;font-size:.875rem;}
+.empty-state{text-align:center;padding:4rem 2rem;color:var(--text-muted);}
+.empty-icon{font-size:3rem;margin-bottom:1rem;}
+.empty-state h3{font-size:1.1rem;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.empty-state p{font-size:.85rem;line-height:1.6;}
 
-/* ── Editor overlay ── */
-.editor-overlay{display:none;position:fixed;inset:0;z-index:100;
-  background:rgba(0,0,0,.75);backdrop-filter:blur(6px);
-  align-items:flex-start;justify-content:center;padding:1.5rem;overflow-y:auto;}
+/* ══ Lists (recepten, community, pages) ══════════════════════════ */
+.list-container{display:flex;flex-direction:column;gap:.5rem;}
+.list-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;transition:border .15s;}
+.list-row:hover{border-color:var(--green);}
+.list-row.pinned{border-color:var(--yellow);background:#fffbeb;}
+.list-row-left{display:flex;align-items:center;gap:.65rem;flex:1;min-width:0;}
+.list-icon{font-size:1.2rem;flex-shrink:0;}
+.list-row-title{font-size:.85rem;font-weight:500;color:var(--text);}
+.list-row-meta{font-size:.7rem;color:var(--text-muted);margin-top:.1rem;}
+.list-row-actions{display:flex;gap:.35rem;flex-shrink:0;flex-wrap:wrap;}
+
+/* ══ Pages list ══════════════════════════════════════════════════ */
+.pages-list{display:flex;flex-direction:column;gap:.6rem;}
+.page-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;transition:border .15s;}
+.page-row:hover{border-color:var(--green);}
+.page-row-left{display:flex;align-items:center;gap:.85rem;flex:1;}
+.page-row-icon{font-size:1.5rem;}
+.page-row-title{font-size:.9rem;font-weight:600;color:var(--text);}
+.page-row-slug{font-size:.72rem;color:var(--text-muted);margin-top:.1rem;font-family:monospace;}
+.page-row-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
+
+/* ══ PAGE BUILDER ════════════════════════════════════════════════ */
+.pb-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:.75rem 1rem;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);margin-bottom:1rem;flex-wrap:wrap;}
+.pb-header-left{display:flex;align-items:center;gap:.75rem;flex:1;flex-wrap:wrap;}
+.pb-header-right{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
+.pb-title-input{font-size:.95rem;font-weight:600;color:var(--text);background:transparent;
+  border:none;border-bottom:2px solid var(--border);padding:.2rem .4rem;outline:none;min-width:200px;transition:border .15s;}
+.pb-title-input:focus{border-bottom-color:var(--green);}
+.pb-slug-input{font-size:.72rem;color:var(--text-muted);background:transparent;border:none;
+  border-bottom:1px dashed var(--border);padding:.15rem .3rem;outline:none;font-family:monospace;min-width:140px;display:block;margin-top:.1rem;}
+.pb-slug-input:focus{border-bottom-color:var(--green);}
+
+.pb-layout{display:grid;grid-template-columns:200px 1fr 240px;gap:1rem;min-height:calc(100vh - 160px);}
+
+/* Palette */
+.pb-palette{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;height:fit-content;position:sticky;top:1rem;}
+.pb-palette-title{padding:.65rem .85rem;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg);}
+.pb-palette-list{padding:.4rem;}
+.palette-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .6rem;border-radius:6px;cursor:pointer;transition:all .15s;margin-bottom:.15rem;}
+.palette-item:hover{background:var(--green-light);}
+.palette-item:active{transform:scale(.97);}
+.palette-icon{font-size:1rem;flex-shrink:0;width:20px;text-align:center;}
+.palette-info{flex:1;min-width:0;}
+.palette-label{font-size:.75rem;font-weight:500;color:var(--text);}
+.palette-desc{font-size:.62rem;color:var(--text-muted);margin-top:.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* Canvas */
+.pb-canvas{background:var(--bg);border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:.75rem;min-height:500px;}
+.pb-canvas.drag-over{border-color:var(--green);background:var(--green-light);}
+.pb-canvas-inner{display:flex;flex-direction:column;gap:.5rem;}
+.canvas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:300px;color:var(--text-muted);text-align:center;gap:.5rem;}
+.canvas-empty-icon{font-size:2.5rem;}
+.canvas-empty p{font-size:.82rem;max-width:220px;line-height:1.6;}
+
+.pb-block{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);
+  padding:.6rem .75rem;display:flex;align-items:center;gap:.65rem;cursor:pointer;transition:all .15s;user-select:none;}
+.pb-block:hover{border-color:var(--green);box-shadow:var(--shadow);}
+.pb-block.selected{border-color:var(--green);background:var(--green-light);box-shadow:0 0 0 3px rgba(22,163,74,.15);}
+.pb-block-handle{color:var(--text-light);cursor:grab;font-size:1rem;flex-shrink:0;}
+.pb-block-handle:active{cursor:grabbing;}
+.pb-block-info{flex:1;min-width:0;}
+.pb-block-type{font-size:.72rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:.1rem;}
+.pb-block-preview{font-size:.78rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+.pb-block-actions{display:flex;gap:.25rem;flex-shrink:0;}
+.pb-block-btn{background:transparent;border:1px solid transparent;border-radius:4px;padding:.2rem .35rem;
+  font-size:.75rem;cursor:pointer;color:var(--text-muted);transition:all .15s;}
+.pb-block-btn:hover{border-color:var(--border2);color:var(--text);background:var(--bg);}
+.pb-block-btn.danger:hover{border-color:var(--red);color:var(--red);background:var(--red-light);}
+
+/* Properties panel */
+.pb-props{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;height:fit-content;position:sticky;top:1rem;}
+.pb-props-title{padding:.65rem .85rem;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg);}
+.pb-props-content{padding:.75rem;max-height:calc(100vh - 200px);overflow-y:auto;}
+.props-placeholder{color:var(--text-muted);font-size:.8rem;line-height:1.6;text-align:center;padding:1.5rem 0;}
+.props-block-title{font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border);}
+.props-group{font-size:.67rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:.75rem 0 .3rem;}
+.prop-field{margin-bottom:.6rem;}
+.prop-label{display:block;font-size:.7rem;color:var(--text-muted);margin-bottom:.2rem;}
+.prop-input{width:100%;padding:.4rem .6rem;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-size:.8rem;outline:none;transition:border .15s;font-family:'Inter',sans-serif;}
+.prop-input:focus{border-color:var(--green);}
+.prop-textarea{width:100%;padding:.4rem .6rem;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-size:.8rem;outline:none;resize:vertical;min-height:70px;font-family:'Inter',sans-serif;}
+.prop-textarea:focus{border-color:var(--green);}
+.prop-color-row{display:flex;align-items:center;justify-content:space-between;}
+.prop-color-wrap{display:flex;align-items:center;gap:.35rem;}
+.prop-color-wrap input[type=color]{width:32px;height:28px;border:1px solid var(--border);border-radius:5px;padding:0;cursor:pointer;}
+.prop-input-color{width:90px;}
+.prop-check{display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-muted);cursor:pointer;margin:.3rem 0;}
+.card-prop-group{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.6rem;margin-bottom:.5rem;}
+
+/* ══ Toggle (published switch) ═══════════════════════════════════ */
+.toggle-label{display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-muted);cursor:pointer;}
+.toggle-label input{display:none;}
+.toggle-track{width:32px;height:18px;background:var(--border2);border-radius:100px;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle-label input:checked~.toggle-track{background:var(--green);}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.toggle-label input:checked~.toggle-track .toggle-thumb{transform:translateX(14px);}
+
+/* ══ Editor overlay (plant / recept / post) ══════════════════════ */
+.editor-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:1rem;}
 .editor-overlay.open{display:flex;}
-.editor-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;
-  width:100%;max-width:800px;margin:auto;}
-.editor-head{display:flex;justify-content:space-between;align-items:center;
-  padding:1.25rem 1.75rem;border-bottom:1px solid var(--border);}
-.editor-head h3{font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--accent3);}
-.close-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);
-  width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:.95rem;
-  display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}
-.close-btn:hover{color:var(--text);}
-.editor-body{padding:1.25rem 1.75rem 1rem;}
+.editor-box{background:var(--surface);border-radius:var(--radius-lg);max-width:760px;width:100%;
+  max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);}
+.editor-head{padding:.9rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);}
+.editor-head h3{font-size:.95rem;font-weight:600;color:var(--text);}
+.close-btn{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.8rem;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.close-btn:hover{border-color:var(--text-muted);color:var(--text);}
+.editor-body{overflow-y:auto;flex:1;padding:1.25rem 1.5rem;}
+.editor-foot{padding:.75rem 1.25rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.5rem;background:var(--bg);}
+.btn-cancel{background:transparent;border:1px solid var(--border);color:var(--text-muted);
+  border-radius:var(--radius);padding:.45rem 1rem;font-size:.82rem;cursor:pointer;transition:all .15s;}
+.btn-cancel:hover{border-color:var(--text-muted);color:var(--text);}
 
-/* Editor tabs */
-.etabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:1.25rem;gap:0;overflow-x:auto;}
-.etab{padding:.45rem .85rem;border:none;background:none;color:var(--text2);
-  font-family:'DM Sans',sans-serif;font-size:.78rem;cursor:pointer;
-  border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:all .2s;}
-.etab:hover{color:var(--text);}
-.etab.active{color:var(--accent);border-bottom-color:var(--accent);}
+/* Tabs */
+.etabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:1rem;gap:0;overflow-x:auto;}
+.etab{padding:.45rem .85rem;border:none;background:none;color:var(--text-muted);
+  font-family:'Inter',sans-serif;font-size:.78rem;cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:all .15s;}
+.etab.active{color:var(--green);border-bottom-color:var(--green);}
 .etab-panel{display:none;}.etab-panel.active{display:block;}
 
 /* Form */
-.fg{display:flex;flex-direction:column;gap:.28rem;margin-bottom:.7rem;}
-.fg label{font-size:.73rem;color:var(--text2);}
-.fg input,.fg select,.fg textarea{
-  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-  color:var(--text);font-family:'DM Sans',sans-serif;font-size:.86rem;
-  padding:.58rem .85rem;outline:none;transition:border .2s;width:100%;}
-.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent);}
-.fg textarea{resize:vertical;min-height:72px;}
-.fg .hint{font-size:.67rem;color:var(--text2);}
-.fg select option{background:var(--surface2);}
+.fg{display:flex;flex-direction:column;gap:.22rem;margin-bottom:.65rem;}
+.fg label{font-size:.7rem;color:var(--text-muted);font-weight:500;}
+.fg input,.fg select,.fg textarea{background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);font-family:'Inter',sans-serif;font-size:.82rem;padding:.5rem .75rem;outline:none;transition:border .15s;width:100%;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.1);}
+.fg textarea{resize:vertical;min-height:70px;}
+.fg .hint{font-size:.65rem;color:var(--text-muted);}
 .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem 1rem;}
 .fgrid .full{grid-column:1/-1;}
 
 /* Photo */
 .photo-wrap{display:flex;gap:1rem;align-items:flex-start;}
 #photo-preview{flex-shrink:0;width:130px;min-height:90px;background:var(--surface2);
-  border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;
-  justify-content:center;overflow:hidden;}
-.no-photo{color:var(--text2);font-size:.75rem;padding:.5rem;}
+  border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.no-photo{color:var(--text-muted);font-size:.72rem;padding:.5rem;text-align:center;}
 .photo-fields{flex:1;}
-
-/* Editor footer */
-.editor-foot{display:flex;justify-content:flex-end;gap:.6rem;
-  padding:.9rem 1.75rem 1.4rem;border-top:1px solid var(--border);margin-top:.75rem;}
-.btn-cancel{background:transparent;border:1px solid var(--border);color:var(--text2);
-  border-radius:100px;padding:.65rem 1.25rem;font-size:.86rem;cursor:pointer;transition:all .2s;}
-.btn-cancel:hover{border-color:var(--text);color:var(--text);}
-
-/* ── Theme ── */
-.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem;margin-bottom:1.25rem;}
-.theme-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  padding:.85rem 1rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;}
-.theme-label{font-size:.82rem;color:var(--text);line-height:1.4;}
-.theme-label span{display:block;font-size:.67rem;color:var(--text2);margin-top:.1rem;}
-.theme-inputs{display:flex;align-items:center;gap:.5rem;}
-.theme-inputs input[type=color]{width:38px;height:30px;border:none;border-radius:6px;
-  cursor:pointer;background:none;padding:0;}
-.theme-inputs input[type=text]{width:82px;background:var(--surface2);border:1px solid var(--border);
-  border-radius:6px;color:var(--text);font-size:.78rem;padding:.3rem .5rem;outline:none;}
-.theme-preview{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;}
-
-/* ── Recepten ── */
-.recept-filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
-.rbtn{padding:.4rem 1rem;border-radius:100px;border:1px solid var(--border);
-  background:var(--surface2);color:var(--text2);cursor:pointer;font-size:.8rem;transition:all .2s;}
-.rbtn:hover,.rbtn.active{border-color:var(--accent2);color:var(--accent2);background:rgba(200,169,110,.08);}
-.recept-list{display:flex;flex-direction:column;gap:.5rem;}
-.recept-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  padding:.85rem 1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;}
-.recept-row:hover{border-color:var(--accent);}
-.recept-row-left{display:flex;align-items:center;gap:.75rem;}
-.recept-cat-dot{font-size:1.3rem;flex-shrink:0;}
-.recept-row-name{font-size:.9rem;color:var(--text);font-weight:500;}
-.recept-row-meta{font-size:.72rem;color:var(--text2);margin-top:.1rem;}
-.recept-row-actions{display:flex;gap:.4rem;flex-shrink:0;}
-
-/* ── Community ── */
-.post-admin-list{display:flex;flex-direction:column;gap:.75rem;}
-.post-admin-card{background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:1.1rem 1.25rem;}
-.post-admin-card.pinned{border-color:var(--accent2);background:rgba(200,169,110,.04);}
-.post-admin-head{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;}
-.post-admin-cat{font-size:.7rem;padding:.2rem .6rem;border-radius:100px;color:var(--text);}
-.pin-badge{font-size:.7rem;color:var(--accent2);}
-.post-admin-date{font-size:.7rem;color:var(--text2);margin-left:auto;}
-.post-admin-author{font-size:.7rem;color:var(--text2);}
-.post-admin-title{font-size:.92rem;font-weight:500;color:var(--accent3);margin-bottom:.35rem;}
-.post-admin-body{font-size:.83rem;color:var(--text2);line-height:1.6;margin-bottom:.6rem;}
-.post-admin-replies{font-size:.75rem;color:var(--text2);margin-bottom:.6rem;}
-.post-admin-actions{display:flex;gap:.4rem;flex-wrap:wrap;}
-
-/* ── Toast ── */
-.toast{position:fixed;bottom:1.25rem;right:1.25rem;background:var(--surface);
-  border:1px solid var(--border);border-radius:10px;padding:.65rem 1.1rem;
-  font-size:.83rem;color:var(--text);z-index:999;pointer-events:none;
-  transform:translateY(12px);opacity:0;transition:all .22s;}
-.toast.show{transform:translateY(0);opacity:1;}
-.toast.toast-ok{border-color:var(--accent);color:var(--accent);}
-.toast.toast-err{border-color:var(--danger);color:var(--danger);}
-.toast.toast-info{border-color:var(--accent2);color:var(--accent2);}
-
-.import-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  padding:2rem;max-width:580px;}
-.import-icon{font-size:3rem;margin-bottom:.75rem;}
-.import-box h3{font-family:'Playfair Display',serif;color:var(--accent3);font-size:1.2rem;margin-bottom:.75rem;}
-.import-box p{color:var(--text2);font-size:.88rem;line-height:1.75;margin-bottom:.5rem;}
-.import-warning{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.25);
-  border-radius:8px;padding:.65rem 1rem;font-size:.82rem;color:var(--accent2);margin-top:.75rem;}
-.prog-line{padding:.3rem 0;font-size:.85rem;color:var(--text2);border-bottom:1px solid var(--border);}
-.prog-ok{color:var(--accent);}
-.prog-err{color:var(--danger);}
-.prog-done{margin-top:1rem;background:rgba(126,200,126,.08);border:1px solid rgba(126,200,126,.25);
-  border-radius:10px;padding:1rem 1.25rem;font-size:.88rem;color:var(--text);line-height:1.75;}
-
-.unsplash-thumb{position:relative;border-radius:8px;overflow:hidden;cursor:pointer;
-  border:2px solid var(--border);transition:border .2s;aspect-ratio:3/2;}
-.unsplash-thumb:hover{border-color:var(--accent);}
+.unsplash-thumb{position:relative;border-radius:var(--radius);overflow:hidden;cursor:pointer;border:1.5px solid var(--border);transition:border .15s;aspect-ratio:3/2;}
+.unsplash-thumb:hover{border-color:var(--green);}
 .unsplash-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
-.unsplash-pick{position:absolute;inset:0;background:rgba(0,0,0,.45);color:#fff;
-  font-size:.75rem;display:flex;align-items:center;justify-content:center;
-  opacity:0;transition:opacity .2s;}
+.unsplash-pick{position:absolute;inset:0;background:rgba(0,0,0,.4);color:#fff;font-size:.72rem;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;}
 .unsplash-thumb:hover .unsplash-pick{opacity:1;}
 
+/* ══ Filter bar ══════════════════════════════════════════════════ */
+.filter-bar{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;}
+.filter-btn{padding:.35rem .85rem;border-radius:100px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text-muted);cursor:pointer;font-size:.75rem;transition:all .15s;}
+.filter-btn:hover,.filter-btn.active{border-color:var(--green);color:var(--green);background:var(--green-light);}
+
+/* ══ Theme ════════════════════════════════════════════════════════ */
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.65rem;margin-bottom:1.25rem;}
+.theme-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.75rem 1rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;}
+.theme-label{font-size:.8rem;color:var(--text);line-height:1.4;}
+.theme-label span{display:block;font-size:.65rem;color:var(--text-muted);font-family:monospace;margin-top:.1rem;}
+.theme-inputs{display:flex;align-items:center;gap:.4rem;}
+.theme-inputs input[type=color]{width:34px;height:28px;border:1px solid var(--border);border-radius:5px;cursor:pointer;padding:0;}
+.theme-inputs input[type=text]{width:82px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-size:.75rem;padding:.3rem .5rem;outline:none;font-family:monospace;}
+.theme-preview{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;}
+
+/* ══ Import ══════════════════════════════════════════════════════ */
+.import-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2rem;max-width:580px;}
+.import-icon{font-size:2.5rem;margin-bottom:.75rem;}
+.import-box h3{font-size:1.1rem;font-weight:600;color:var(--text);margin-bottom:.65rem;}
+.import-box p{color:var(--text-muted);font-size:.85rem;line-height:1.7;margin-bottom:.4rem;}
+.import-warning{background:#fffbeb;border:1px solid rgba(217,119,6,.3);border-radius:6px;
+  padding:.55rem .85rem;font-size:.78rem;color:var(--yellow);margin-top:.65rem;}
+.prog-line{padding:.28rem 0;font-size:.82rem;color:var(--text-muted);border-bottom:1px solid var(--border);}
+.prog-ok{color:var(--green)!important;}
+.prog-err{color:var(--red)!important;}
+.prog-done{margin-top:1rem;background:var(--green-light);border:1px solid rgba(22,163,74,.3);
+  border-radius:var(--radius);padding:.85rem 1rem;font-size:.85rem;color:var(--green-dark);line-height:1.75;}
+
+/* ══ Toast ════════════════════════════════════════════════════════ */
+.toast{position:fixed;bottom:1.25rem;right:1.25rem;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:.55rem 1rem;font-size:.8rem;color:var(--text);z-index:999;
+  pointer-events:none;transform:translateY(8px);opacity:0;transition:all .2s;box-shadow:var(--shadow-md);}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.toast-ok{border-color:var(--green);color:var(--green);}
+.toast.toast-err{border-color:var(--red);color:var(--red);}
+.toast.toast-info{border-color:var(--yellow);color:var(--yellow);}
+
+@media(max-width:900px){
+  .pb-layout{grid-template-columns:1fr;}
+  .pb-palette,.pb-props{position:static;}
+}
 @media(max-width:700px){
-  .sidebar{display:none;}
-  .main-content{margin-left:0;padding:1.25rem;}
+  .sidebar{transform:translateX(-100%);}.main-content{margin-left:0;padding:1rem;}
   .fgrid{grid-template-columns:1fr;}
 }
 </style>
 </head>
 <body>
 
-<!-- Config warning (als Firebase nog niet ingevuld is) -->
+<!-- Config warning -->
 <div id="config-warning">
   <div class="config-box">
     <h2>🔧 Firebase config ontbreekt</h2>
-    <p>Open <code>admin.html</code> in een teksteditor en vul jouw Firebase-configuratie in bovenaan het bestand (vervang de <code>JOUW_…</code> waarden).</p>
-    <p>Heb je nog geen Firebase project? Lees de <a href="handleiding.html" target="_blank">handleiding.html</a> stap voor stap door.</p>
+    <p>Open <code>admin.html</code> en vul jouw Firebase-configuratie bovenaan in het bestand in.</p>
   </div>
 </div>
 
 <!-- Login -->
 <div id="login-screen">
   <div class="login-box">
-    <div class="login-logo">🌿 Herbal<span>Root</span></div>
+    <div class="login-logo">
+      <span class="login-logo-icon">🌿</span>
+      <span class="login-logo-text">Herbal<span>Root</span></span>
+    </div>
     <div class="login-sub">Beheerderspaneel — log in met je Google-account</div>
     <button class="btn-google" id="google-btn" onclick="loginWithGoogle()">
       <svg class="google-icon" viewBox="0 0 48 48">
@@ -1112,36 +1413,61 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div id="app-screen">
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-text">🌿 Herbal<span>Root</span></div>
-      <div class="logo-sub">Beheerderspaneel</div>
+      <span class="logo-icon">🌿</span>
+      <div>
+        <div class="logo-text">Herbal<span>Root</span></div>
+        <div class="logo-sub">Beheerderspaneel</div>
+      </div>
     </div>
     <nav class="sidebar-nav">
-      <div class="nav-label">Planten beheren</div>
-      <div class="nav-item active" data-section="kruiden" onclick="switchSection('kruiden')">🌱 Kruiden</div>
-      <div class="nav-item" data-section="groenten" onclick="switchSection('groenten')">🥦 Groenten</div>
-      <div class="nav-item" data-section="fruit" onclick="switchSection('fruit')">🍎 Fruit</div>
-      <div class="nav-label" style="margin-top:.5rem">Content</div>
-      <div class="nav-item" data-section="recepten" onclick="switchSection('recepten')">🍳 Recepten</div>
-      <div class="nav-item" data-section="community" onclick="switchSection('community')">🌿 Community</div>
-      <div class="nav-label" style="margin-top:.5rem">Instellingen</div>
-      <div class="nav-item" data-section="thema" onclick="switchSection('thema')">🎨 Thema & Kleuren</div>
-      <div class="nav-label" style="margin-top:.5rem">Data</div>
-      <div class="nav-item" data-section="import" onclick="switchSection('import')">📥 Importeer startdata</div>
-    </nav>
-    <div class="sidebar-user">
-      <img id="user-avatar" alt="avatar">
-      <div class="user-avatar-fallback" id="user-fallback">👤</div>
-      <div class="user-info-text">
-        <div class="user-info-name" id="user-name"></div>
-        <div class="user-info-email" id="user-email"></div>
+      <div class="nav-section">Overzicht</div>
+      <div class="nav-item active" data-section="dashboard" onclick="switchSection('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
       </div>
-      <button class="btn-logout" onclick="doLogout()" title="Uitloggen">↩</button>
+      <div class="nav-section">Planten</div>
+      <div class="nav-item" data-section="kruiden" onclick="switchSection('kruiden')">
+        <span class="nav-icon">🌱</span> Kruiden
+      </div>
+      <div class="nav-item" data-section="groenten" onclick="switchSection('groenten')">
+        <span class="nav-icon">🥦</span> Groenten
+      </div>
+      <div class="nav-item" data-section="fruit" onclick="switchSection('fruit')">
+        <span class="nav-icon">🍎</span> Fruit
+      </div>
+      <div class="nav-section">Content</div>
+      <div class="nav-item" data-section="paginas" onclick="switchSection('paginas')">
+        <span class="nav-icon">📄</span> Pagina's
+      </div>
+      <div class="nav-item" data-section="recepten" onclick="switchSection('recepten')">
+        <span class="nav-icon">🍳</span> Recepten
+      </div>
+      <div class="nav-item" data-section="community" onclick="switchSection('community')">
+        <span class="nav-icon">💬</span> Community
+      </div>
+      <div class="nav-section">Instellingen</div>
+      <div class="nav-item" data-section="thema" onclick="switchSection('thema')">
+        <span class="nav-icon">🎨</span> Thema & Kleuren
+      </div>
+      <div class="nav-item" data-section="import" onclick="switchSection('import')">
+        <span class="nav-icon">📥</span> Importeer startdata
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <img id="user-avatar" alt="avatar">
+        <div class="user-avatar-fallback" id="user-fallback">👤</div>
+        <div class="user-info">
+          <div class="user-name" id="user-name"></div>
+          <div class="user-email" id="user-email"></div>
+        </div>
+        <button class="btn-logout" onclick="doLogout()" title="Uitloggen">↩</button>
+      </div>
     </div>
   </aside>
   <main class="main-content" id="main-panel"></main>
 </div>
 
-<!-- Editor overlay -->
+<!-- Plant editor overlay -->
 <div class="editor-overlay" id="editor-overlay">
   <div class="editor-box">
     <div class="editor-head">
@@ -1156,31 +1482,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <button class="etab" onclick="switchEtab('foto',this)">📸 Foto</button>
         <button class="etab" onclick="switchEtab('plagen',this)">🐛 Plagen</button>
       </div>
-
       <div class="etab-panel active" id="etab-basis">
         <div class="fgrid">
-          <div class="fg"><label>ID *</label>
-            <input id="ed-id" placeholder="bijv. basilicum">
-            <span class="hint">Kleine letters, geen spaties. Niet wijzigen na aanmaken.</span></div>
+          <div class="fg"><label>ID *</label><input id="ed-id" placeholder="bijv. basilicum"><span class="hint">Kleine letters, geen spaties. Niet wijzigen na aanmaken.</span></div>
           <div class="fg"><label>Emoji</label><input id="ed-emoji" placeholder="🌿"></div>
           <div class="fg"><label>Naam</label><input id="ed-name" placeholder="Basilicum"></div>
           <div class="fg"><label>Latijnse naam</label><input id="ed-lat" placeholder="Ocimum basilicum"></div>
           <div class="fg"><label>Verzorgingsniveau</label>
-            <select id="ed-care">
-              <option value="easy">⚡ Weinig zorg</option>
-              <option value="medium">🌱 Matige zorg</option>
-              <option value="hard">🌳 Veel zorg</option>
-            </select></div>
-          <div class="fg"><label>Categorieën</label>
-            <input id="ed-cat" placeholder="thee, koken, insecten">
-            <span class="hint">Komma-gescheiden</span></div>
-          <div class="fg"><label>Goede buurtplanten</label>
-            <input id="ed-good" placeholder="Tomaat, Basilicum"></div>
-          <div class="fg"><label>Slechte buurtplanten</label>
-            <input id="ed-bad" placeholder="Peterselie, Salie"></div>
+            <select id="ed-care"><option value="easy">⚡ Weinig zorg</option><option value="medium">🌱 Matige zorg</option><option value="hard">🌳 Veel zorg</option></select></div>
+          <div class="fg"><label>Categorieën</label><input id="ed-cat" placeholder="thee, koken, insecten"><span class="hint">Komma-gescheiden</span></div>
+          <div class="fg"><label>Goede buurtplanten</label><input id="ed-good" placeholder="Tomaat, Basilicum"></div>
+          <div class="fg"><label>Slechte buurtplanten</label><input id="ed-bad" placeholder="Peterselie"></div>
         </div>
       </div>
-
       <div class="etab-panel" id="etab-kweek">
         <div class="fgrid">
           <div class="fg"><label>Zonlicht</label><input id="ed-sun" placeholder="Volle zon – halfschaduw"></div>
@@ -1188,9 +1502,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="fg"><label>pH grond</label><input id="ed-ph" placeholder="6.0–7.0"></div>
           <div class="fg"><label>Grondtype</label><input id="ed-soil" placeholder="Lichte, drainerende grond"></div>
           <div class="fg"><label>Watergift (elke X dagen)</label><input id="ed-wf" type="number" min="1" max="30"></div>
-          <div class="fg"><label>Zaaien binnen (maanden 1–12)</label>
-            <input id="ed-zaai_binnen" placeholder="2, 3, 4">
-            <span class="hint">Maandnummers, komma-gescheiden</span></div>
+          <div class="fg"><label>Zaaien binnen (maanden 1–12)</label><input id="ed-zaai_binnen" placeholder="2, 3, 4"><span class="hint">Maandnummers, komma-gescheiden</span></div>
           <div class="fg"><label>Zaaien buiten</label><input id="ed-zaai_buiten" placeholder="4, 5"></div>
           <div class="fg"><label>Uitplanten</label><input id="ed-uitplanten" placeholder="5, 6"></div>
           <div class="fg"><label>Oogst</label><input id="ed-oogst" placeholder="6, 7, 8, 9"></div>
@@ -1199,17 +1511,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           <div class="fg full"><label>Hoe stekken?</label><textarea id="ed-stek_hoe" rows="3"></textarea></div>
         </div>
       </div>
-
       <div class="etab-panel" id="etab-inhoud">
         <div class="fgrid">
           <div class="fg full"><label>Kweektip</label><textarea id="ed-tip" rows="3"></textarea></div>
-          <div class="fg full"><label>Bewaring</label>
-            <textarea id="ed-bewaring" rows="4" placeholder="Gebruik &lt;strong&gt;Label&lt;/strong&gt;&lt;br&gt; voor secties"></textarea></div>
+          <div class="fg full"><label>Bewaring</label><textarea id="ed-bewaring" rows="4" placeholder="Gebruik &lt;strong&gt;Label&lt;/strong&gt;&lt;br&gt; voor secties"></textarea></div>
           <div class="fg"><label>Voordelen (één per regel)</label><textarea id="ed-ben" rows="5"></textarea></div>
           <div class="fg"><label>Recepten (één per regel)</label><textarea id="ed-rec" rows="5"></textarea></div>
         </div>
       </div>
-
       <div class="etab-panel" id="etab-foto">
         <div class="photo-wrap">
           <div id="photo-preview"><span class="no-photo">Geen foto</span></div>
@@ -1219,21 +1528,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
               <input id="ed-photo-url" placeholder="https://..." oninput="previewPhotoUrl()">
               <span class="hint">Directe link naar een afbeelding (jpg, png, webp)</span>
             </div>
-            <button class="btn-primary" style="margin-top:.5rem;width:100%;font-size:.82rem"
-              onclick="searchUnsplash()">🔍 Zoek foto's op Unsplash</button>
-            <span class="hint" style="display:block;margin-top:.3rem">Zoekt automatisch op de naam van de plant — gratis en zonder account</span>
+            <button class="btn-primary" style="width:100%;font-size:.78rem;margin-top:.4rem" onclick="searchUnsplash()">🔍 Zoek foto's op Unsplash</button>
           </div>
         </div>
-        <div id="unsplash-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.6rem;margin-top:1rem"></div>
+        <div id="unsplash-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.5rem;margin-top:.85rem"></div>
       </div>
-
       <div class="etab-panel" id="etab-plagen">
         <div class="fg"><label>🐛 Insecten & plagen (JSON)</label>
-          <textarea id="ed-pests" rows="8" style="font-family:monospace;font-size:.76rem"
-            placeholder='[{"naam":"Bladluis","beschrijving":"Groene luizen op jonge scheuten.","voorkomen":"Spuit met zeepwater."}]'></textarea></div>
+          <textarea id="ed-pests" rows="8" style="font-family:monospace;font-size:.72rem" placeholder='[{"naam":"Bladluis","beschrijving":"...","voorkomen":"..."}]'></textarea></div>
         <div class="fg"><label>🍂 Ziektes (JSON)</label>
-          <textarea id="ed-diseases" rows="8" style="font-family:monospace;font-size:.76rem"
-            placeholder='[{"naam":"Meeldauw","beschrijving":"Wit poeder op blad.","voorkomen":"Goede luchtcirculatie."}]'></textarea></div>
+          <textarea id="ed-diseases" rows="8" style="font-family:monospace;font-size:.72rem" placeholder='[{"naam":"Meeldauw","beschrijving":"...","voorkomen":"..."}]'></textarea></div>
       </div>
     </div>
     <div class="editor-foot">
@@ -1243,9 +1547,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
-<!-- Recept editor overlay -->
+<!-- Recept editor -->
 <div class="editor-overlay" id="recept-editor-overlay">
   <div class="editor-box">
     <div class="editor-head">
@@ -1254,37 +1556,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     </div>
     <div class="editor-body">
       <div class="fgrid">
-        <div class="fg full"><label>Naam *</label>
-          <input id="re-naam" placeholder="bijv. Mojito">
-          <span class="hint">Unieke naam — niet wijzigen na aanmaken</span></div>
+        <div class="fg full"><label>Naam *</label><input id="re-naam" placeholder="bijv. Mojito"><span class="hint">Unieke naam — niet wijzigen na aanmaken</span></div>
         <div class="fg"><label>Categorie</label>
-          <select id="re-cat">
-            <option value="koken">🍽 Koken</option>
-            <option value="soep">🥣 Soep</option>
-            <option value="drank">🥤 Drank</option>
-            <option value="thee">🍵 Thee</option>
-            <option value="dessert">🍰 Dessert</option>
-          </select></div>
-        <div class="fg"><label>Plant/kruid ID</label>
-          <input id="re-herbid" placeholder="bijv. munt"></div>
-        <div class="fg"><label>Bereidingstijd</label>
-          <input id="re-tijd" placeholder="bijv. 15 min"></div>
-        <div class="fg"><label>Porties</label>
-          <input id="re-porties" placeholder="bijv. 4 porties"></div>
+          <select id="re-cat"><option value="koken">🍽 Koken</option><option value="soep">🥣 Soep</option><option value="drank">🥤 Drank</option><option value="thee">🍵 Thee</option><option value="dessert">🍰 Dessert</option></select></div>
+        <div class="fg"><label>Plant/kruid ID</label><input id="re-herbid" placeholder="bijv. munt"></div>
+        <div class="fg"><label>Bereidingstijd</label><input id="re-tijd" placeholder="15 min"></div>
+        <div class="fg"><label>Porties</label><input id="re-porties" placeholder="4 porties"></div>
         <div class="fg"><label>Moeilijkheid</label>
-          <select id="re-moeilijk">
-            <option>⚡ Makkelijk</option>
-            <option>🌱 Gemiddeld</option>
-            <option>🌳 Uitdagend</option>
-          </select></div>
-        <div class="fg full"><label>Introductie</label>
-          <textarea id="re-intro" rows="2"></textarea></div>
-        <div class="fg full"><label>Ingrediënten (één per regel)</label>
-          <textarea id="re-ingredienten" rows="6" placeholder="500 g bloem&#10;2 eieren&#10;..."></textarea></div>
-        <div class="fg full"><label>Werkwijze (één stap per regel)</label>
-          <textarea id="re-methode" rows="6" placeholder="Verwarm de oven op 180°C.&#10;Meng de ingrediënten.&#10;..."></textarea></div>
-        <div class="fg full"><label>Tip</label>
-          <textarea id="re-tip" rows="2"></textarea></div>
+          <select id="re-moeilijk"><option>⚡ Makkelijk</option><option>🌱 Gemiddeld</option><option>🌳 Uitdagend</option></select></div>
+        <div class="fg full"><label>Introductie</label><textarea id="re-intro" rows="2"></textarea></div>
+        <div class="fg full"><label>Ingrediënten (één per regel)</label><textarea id="re-ingredienten" rows="6"></textarea></div>
+        <div class="fg full"><label>Werkwijze (één stap per regel)</label><textarea id="re-methode" rows="6"></textarea></div>
+        <div class="fg full"><label>Tip</label><textarea id="re-tip" rows="2"></textarea></div>
       </div>
     </div>
     <div class="editor-foot">
@@ -1294,9 +1577,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
-<!-- Community post editor overlay -->
+<!-- Community post editor -->
 <div class="editor-overlay" id="post-editor-overlay">
-  <div class="editor-box" style="max-width:560px">
+  <div class="editor-box" style="max-width:520px">
     <div class="editor-head">
       <h3 id="pe-title-head">Bericht bewerken</h3>
       <button class="close-btn" onclick="closePostEditor()">✕</button>
@@ -1304,19 +1587,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div class="editor-body">
       <input type="hidden" id="pe-id">
       <div class="fgrid">
-        <div class="fg"><label>Auteur</label>
-          <input id="pe-author" placeholder="HerbalRoot Team"></div>
+        <div class="fg"><label>Auteur</label><input id="pe-author" placeholder="HerbalRoot Team"></div>
         <div class="fg"><label>Categorie</label>
-          <select id="pe-cat">
-            <option value="tip">💡 Tip</option>
-            <option value="vraag">❓ Vraag</option>
-            <option value="recept">🍳 Recept</option>
-            <option value="oogst">🌾 Oogst</option>
-          </select></div>
-        <div class="fg full"><label>Titel</label>
-          <input id="pe-title" placeholder="Titel van het bericht"></div>
-        <div class="fg full"><label>Inhoud</label>
-          <textarea id="pe-body" rows="5"></textarea></div>
+          <select id="pe-cat"><option value="tip">💡 Tip</option><option value="vraag">❓ Vraag</option><option value="recept">🍳 Recept</option><option value="oogst">🌾 Oogst</option></select></div>
+        <div class="fg full"><label>Titel</label><input id="pe-title" placeholder="Titel van het bericht"></div>
+        <div class="fg full"><label>Inhoud</label><textarea id="pe-body" rows="5"></textarea></div>
       </div>
     </div>
     <div class="editor-foot">
@@ -1326,8 +1601,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
-function switchEtab(id, btn) {
+function switchEtab(id,btn){
   document.querySelectorAll('.etab').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.etab-panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active');
