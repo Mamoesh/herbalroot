@@ -360,13 +360,6 @@ const BLOCK_TYPES = [
   { id:'gallery', icon:'🖼🖼', label:'Galerij',         desc:'Fotogrid (2-4 foto\'s)' },
 ];
 
-async function loadPages() {
-  try {
-    const snap = await getDocs(collection(db,'pages'));
-    pages = snap.docs.map(d=>({id:d.id,...d.data()}));
-  } catch(e){ pages=[]; }
-}
-
 function renderPageManager() {
   document.getElementById('main-panel').innerHTML = `
     <div class="page-title-row">
