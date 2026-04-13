@@ -6,6 +6,7 @@
 <title>HerbalRoot – Beheer</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
 <script type="module">
+// Firebase imports via ESM — functies worden via window.* globaal beschikbaar gemaakt
 import { initializeApp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
@@ -1018,6 +1019,19 @@ function toast(msg,type='ok'){
   el._t=setTimeout(()=>el.classList.remove('show'),3000);
 }
 window.showToast=toast;
+
+// ── Globale bridge: koppel knoppen via addEventListener (omzeilt module scope) ──
+document.addEventListener('DOMContentLoaded', () => {
+  const googleBtn = document.getElementById('google-btn');
+  if (googleBtn) {
+    googleBtn.removeAttribute('onclick');
+    googleBtn.addEventListener('click', () => window.loginWithGoogle());
+  }
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => window.doLogout());
+  }
+});
 </script>
 
 <style>
@@ -1395,7 +1409,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <span class="login-logo-text">Herbal<span>Root</span></span>
     </div>
     <div class="login-sub">Beheerderspaneel — log in met je Google-account</div>
-    <button class="btn-google" id="google-btn" onclick="loginWithGoogle()">
+    <button class="btn-google" id="google-btn">
       <svg class="google-icon" viewBox="0 0 48 48">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -1460,7 +1474,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
           <div class="user-name" id="user-name"></div>
           <div class="user-email" id="user-email"></div>
         </div>
-        <button class="btn-logout" onclick="doLogout()" title="Uitloggen">↩</button>
+        <button class="btn-logout" id="logout-btn" title="Uitloggen">↩</button>
       </div>
     </div>
   </aside>
