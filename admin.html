@@ -167,99 +167,75 @@ window.switchSection = s => {
 
 // ── Dashboard ─────────────────────────────────────────────────
 function renderDashboard() {
-  document.getElementById('main-panel').innerHTML = `
-    <div class="page-title">Dashboard</div>
-    <div class="dash-section-title" style="margin-bottom:.65rem">📊 Overzicht</div>
-    <div class="stat-grid">
-      <div class="stat-card" onclick="switchSection('kruiden')">
-        <div class="stat-icon">🌱</div>
-        <div class="stat-num">\${allPlants.kruiden?.length||0}</div>
-        <div class="stat-label">Kruiden</div>
-      </div>
-      <div class="stat-card" onclick="switchSection('groenten')">
-        <div class="stat-icon">🥦</div>
-        <div class="stat-num">\${allPlants.groenten?.length||0}</div>
-        <div class="stat-label">Groenten</div>
-      </div>
-      <div class="stat-card" onclick="switchSection('fruit')">
-        <div class="stat-icon">🍎</div>
-        <div class="stat-num">\${allPlants.fruit?.length||0}</div>
-        <div class="stat-label">Fruit</div>
-      </div>
-      <div class="stat-card" onclick="switchSection('recepten')">
-        <div class="stat-icon">🍳</div>
-        <div class="stat-num">\${Object.keys(allRecepten).length}</div>
-        <div class="stat-label">Recepten</div>
-      </div>
-      <div class="stat-card" onclick="switchSection('community')">
-        <div class="stat-icon">💬</div>
-        <div class="stat-num">\${allPosts.length}</div>
-        <div class="stat-label">Community posts</div>
-      </div>
-      <div class="stat-card" onclick="switchSection('paginas')">
-        <div class="stat-icon">📄</div>
-        <div class="stat-num">\${pages.length}</div>
-        <div class="stat-label">Pagina's</div>
-      </div>
-      <div class="stat-card stat-card-info">
-        <div class="stat-icon">🥕</div>
-        <div class="stat-num">∞</div>
-        <div class="stat-label">Mijn Moestuin</div>
-        <div class="stat-sub">Beheerd door gebruikers</div>
-      </div>
-      <div class="stat-card stat-card-info">
-        <div class="stat-icon">👤</div>
-        <div class="stat-num">∞</div>
-        <div class="stat-label">Profielen</div>
-        <div class="stat-sub">Beheerd door gebruikers</div>
-      </div>
-    </div>
+  const k = allPlants.kruiden?.length||0;
+  const g = allPlants.groenten?.length||0;
+  const fr = allPlants.fruit?.length||0;
+  const rec = Object.keys(allRecepten).length;
+  const com = allPosts.length;
+  const pg = pages.length;
 
-    <div class="dash-two-col">
-      <div>
-        <div class="dash-section-title">⚡ Snelle acties</div>
-        <div class="quick-actions">
-          <button class="qa-btn" onclick="switchSection('kruiden');setTimeout(()=>openEditor(null,'kruiden'),50)">
-            <span class="qa-icon">🌱</span><span>Nieuw kruid</span>
-          </button>
-          <button class="qa-btn" onclick="switchSection('groenten');setTimeout(()=>openEditor(null,'groenten'),50)">
-            <span class="qa-icon">🥦</span><span>Nieuwe groente</span>
-          </button>
-          <button class="qa-btn" onclick="switchSection('fruit');setTimeout(()=>openEditor(null,'fruit'),50)">
-            <span class="qa-icon">🍎</span><span>Nieuw fruit</span>
-          </button>
-          <button class="qa-btn" onclick="switchSection('paginas');setTimeout(()=>openPageEditor(null),100)">
-            <span class="qa-icon">📄</span><span>Nieuwe pagina</span>
-          </button>
-          <button class="qa-btn" onclick="switchSection('recepten');setTimeout(()=>openReceptEditor(null),50)">
-            <span class="qa-icon">🍳</span><span>Nieuw recept</span>
-          </button>
-          <button class="qa-btn" onclick="window.open('index.html','_blank')">
-            <span class="qa-icon">👁</span><span>Bekijk website</span>
-          </button>
-        </div>
-      </div>
-      <div>
-        <div class="dash-section-title">📸 Foto uploaden naar Firebase Storage</div>
-        <div class="upload-dash-box">
-          <div class="upload-drop-area" id="dash-drop-area"
-            ondragover="event.preventDefault();this.classList.add('drag-over')"
-            ondragleave="this.classList.remove('drag-over')"
-            ondrop="dashHandleDrop(event)">
-            <div class="upload-drop-icon">📁</div>
-            <p>Sleep een foto hierheen<br>of klik om te bladeren</p>
-            <input type="file" id="dash-file-input" accept="image/*" style="display:none" onchange="dashHandleFile(this.files[0])">
-            <button class="btn-outline-sm" style="margin-top:.5rem" onclick="document.getElementById('dash-file-input').click()">Bestand kiezen</button>
-          </div>
-          <div id="dash-upload-preview" style="display:none">
-            <img id="dash-preview-img" style="max-height:120px;border-radius:8px;object-fit:cover;margin-bottom:.5rem">
-            <div id="dash-file-name" style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem"></div>
-            <button class="btn-primary" style="width:100%" onclick="dashUploadToStorage()">⬆️ Uploaden naar Firebase</button>
-          </div>
-          <div id="dash-upload-result" style="margin-top:.75rem"></div>
-        </div>
-      </div>
-    </div>`;
+  document.getElementById('main-panel').innerHTML =
+    '<div class="page-title">Dashboard</div>' +
+    '<div class="dash-section-title" style="margin-bottom:.65rem">📊 Overzicht</div>' +
+    '<div class="stat-grid">' +
+      '<div class="stat-card" onclick="switchSection(\'kruiden\')">' +
+        '<div class="stat-icon">🌱</div><div class="stat-num">' + k + '</div><div class="stat-label">Kruiden</div></div>' +
+      '<div class="stat-card" onclick="switchSection(\'groenten\')">' +
+        '<div class="stat-icon">🥦</div><div class="stat-num">' + g + '</div><div class="stat-label">Groenten</div></div>' +
+      '<div class="stat-card" onclick="switchSection(\'fruit\')">' +
+        '<div class="stat-icon">🍎</div><div class="stat-num">' + fr + '</div><div class="stat-label">Fruit</div></div>' +
+      '<div class="stat-card" onclick="switchSection(\'recepten\')">' +
+        '<div class="stat-icon">🍳</div><div class="stat-num">' + rec + '</div><div class="stat-label">Recepten</div></div>' +
+      '<div class="stat-card" onclick="switchSection(\'community\')">' +
+        '<div class="stat-icon">💬</div><div class="stat-num">' + com + '</div><div class="stat-label">Community posts</div></div>' +
+      '<div class="stat-card" onclick="switchSection(\'paginas\')">' +
+        '<div class="stat-icon">📄</div><div class="stat-num">' + pg + '</div><div class="stat-label">Pagina\'s</div></div>' +
+      '<div class="stat-card stat-card-info">' +
+        '<div class="stat-icon">🥕</div><div class="stat-num">∞</div>' +
+        '<div class="stat-label">Mijn Moestuin</div><div class="stat-sub">Beheerd door gebruikers</div></div>' +
+      '<div class="stat-card stat-card-info">' +
+        '<div class="stat-icon">👤</div><div class="stat-num">∞</div>' +
+        '<div class="stat-label">Profielen</div><div class="stat-sub">Beheerd door gebruikers</div></div>' +
+    '</div>' +
+    '<div class="dash-two-col">' +
+      '<div>' +
+        '<div class="dash-section-title">⚡ Snelle acties</div>' +
+        '<div class="quick-actions">' +
+          '<button class="qa-btn" onclick="switchSection(\'kruiden\');setTimeout(()=>openEditor(null,\'kruiden\'),50)">' +
+            '<span class="qa-icon">🌱</span><span>Nieuw kruid</span></button>' +
+          '<button class="qa-btn" onclick="switchSection(\'groenten\');setTimeout(()=>openEditor(null,\'groenten\'),50)">' +
+            '<span class="qa-icon">🥦</span><span>Nieuwe groente</span></button>' +
+          '<button class="qa-btn" onclick="switchSection(\'fruit\');setTimeout(()=>openEditor(null,\'fruit\'),50)">' +
+            '<span class="qa-icon">🍎</span><span>Nieuw fruit</span></button>' +
+          '<button class="qa-btn" onclick="switchSection(\'paginas\');setTimeout(()=>openPageEditor(null),100)">' +
+            '<span class="qa-icon">📄</span><span>Nieuwe pagina</span></button>' +
+          '<button class="qa-btn" onclick="switchSection(\'recepten\');setTimeout(()=>openReceptEditor(null),50)">' +
+            '<span class="qa-icon">🍳</span><span>Nieuw recept</span></button>' +
+          '<button class="qa-btn" onclick="window.open(\'index.html\',\'_blank\')">' +
+            '<span class="qa-icon">👁</span><span>Bekijk website</span></button>' +
+        '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div class="dash-section-title">📸 Foto uploaden naar Firebase Storage</div>' +
+        '<div class="upload-dash-box">' +
+          '<div class="upload-drop-area" id="dash-drop-area"' +
+            ' ondragover="event.preventDefault();this.classList.add(\'drag-over\')"' +
+            ' ondragleave="this.classList.remove(\'drag-over\')"' +
+            ' ondrop="dashHandleDrop(event)">' +
+            '<div class="upload-drop-icon">📁</div>' +
+            '<p>Sleep een foto hierheen<br>of klik om te bladeren</p>' +
+            '<input type="file" id="dash-file-input" accept="image/*" style="display:none" onchange="dashHandleFile(this.files[0])">' +
+            '<button class="btn-outline-sm" style="margin-top:.5rem" onclick="document.getElementById(\'dash-file-input\').click()">Bestand kiezen</button>' +
+          '</div>' +
+          '<div id="dash-upload-preview" style="display:none">' +
+            '<img id="dash-preview-img" style="max-height:120px;border-radius:8px;object-fit:cover;margin-bottom:.5rem;width:100%">' +
+            '<div id="dash-file-name" style="font-size:.75rem;color:var(--text-muted);margin-bottom:.5rem"></div>' +
+            '<button class="btn-primary" style="width:100%" onclick="dashUploadToStorage()">⬆️ Uploaden naar Firebase</button>' +
+          '</div>' +
+          '<div id="dash-upload-result" style="margin-top:.75rem"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
 }
 
 // ── Plant raster ──────────────────────────────────────────────
