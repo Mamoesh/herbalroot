@@ -375,8 +375,8 @@ async function loadFirebaseData() {
 
 // Wacht tot de pagina klaar is, laad dan Firebase data
 window.addEventListener('DOMContentLoaded', () => {
-  // Kleine vertraging zodat de lokale arrays eerst geïnitialiseerd zijn
-  setTimeout(loadFirebaseData, 500);
+  // Laad Firebase data zodra de pagina klaar is
+  loadFirebaseData();
 });
 </script>
 </head>
