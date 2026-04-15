@@ -280,6 +280,21 @@ window.openEditor = (id, type) => {
 window.closeEditor=()=>{document.getElementById('editor-overlay').classList.remove('open');editingId=null;editingType=null;};
 
 window.savePlant = async () => {
+  // Zet Wikimedia Commons pagina-URL om naar directe afbeeldingslink voor opslaan
+  const photoField = document.getElementById('ed-photo-url');
+  if (photoField && photoField.value.includes('commons.wikimedia.org/wiki/File:')) {
+    const fileName = decodeURIComponent(photoField.value.split('/wiki/File:')[1]);
+    try {
+      const res = await fetch(
+        'https://en.wikipedia.org/w/api.php?action=query&titles=File:'+encodeURIComponent(fileName)+
+        '&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*'
+      );
+      const data = await res.json();
+      const pages = Object.values(data.query?.pages||{});
+      const directUrl = pages[0]?.imageinfo?.[0]?.thumburl || pages[0]?.imageinfo?.[0]?.url;
+      if (directUrl) photoField.value = directUrl;
+    } catch(e) {}
+  }
   const get=id=>(document.getElementById(id)||{}).value||'';
   const id=get('ed-id').trim().toLowerCase().replace(/\s+/g,'-');
   if(!id){toast('Vul een ID in.','err');return;}
@@ -394,11 +409,33 @@ window.selectPhoto=url=>{
   document.getElementById('photo-preview').innerHTML=`<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover">`;
   document.getElementById('unsplash-results').innerHTML='<span style="color:var(--green);font-size:.8rem">✓ Foto geselecteerd</span>';
 };
-window.previewPhotoUrl=()=>{
-  const url=document.getElementById('ed-photo-url').value.trim();
-  document.getElementById('photo-preview').innerHTML=url
-    ?`<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover" onerror="this.parentElement.innerHTML='<span class=no-photo>URL niet geldig</span>'">`
-    :'<span class="no-photo">Geen foto</span>';
+window.previewPhotoUrl=async()=>{
+  let url=document.getElementById('ed-photo-url').value.trim();
+  if(!url){document.getElementById('photo-preview').innerHTML='<span class="no-photo">Geen foto</span>';return;}
+
+  // Wikimedia Commons pagina-URL automatisch omzetten naar directe afbeeldingslink
+  if(url.includes('commons.wikimedia.org/wiki/File:')) {
+    const fileName = decodeURIComponent(url.split('/wiki/File:')[1]);
+    document.getElementById('photo-preview').innerHTML='<span class="no-photo">🔄 Omzetten...</span>';
+    try {
+      const res = await fetch(
+        'https://en.wikipedia.org/w/api.php?action=query&titles=File:'+encodeURIComponent(fileName)+
+        '&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*'
+      );
+      const data = await res.json();
+      const pages = Object.values(data.query?.pages||{});
+      const directUrl = pages[0]?.imageinfo?.[0]?.thumburl || pages[0]?.imageinfo?.[0]?.url;
+      if(directUrl) {
+        url = directUrl;
+        document.getElementById('ed-photo-url').value = url;
+      }
+    } catch(e) {}
+  }
+
+  document.getElementById('photo-preview').innerHTML=
+    `<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover;width:100%"
+      referrerpolicy="no-referrer"
+      onerror="this.parentElement.innerHTML='<span class=no-photo>URL niet geldig — gebruik een directe afbeeldingslink die eindigt op .jpg of .png</span>'">`;
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -1631,7 +1668,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
             <div class="fg">
               <label>Foto-URL plakken</label>
               <input id="ed-photo-url" placeholder="https://..." oninput="previewPhotoUrl()">
-              <span class="hint">Directe link naar een afbeelding (jpg, png, webp)</span>
+              <span class="hint">
+                ✅ Wikimedia Commons pagina-URL's worden automatisch omgezet (bv. https://commons.wikimedia.org/wiki/File:...)<br>
+                ✅ Directe afbeeldingslinks die eindigen op .jpg, .png of .webp werken ook
+              </span>
             </div>
             <button class="btn-primary" style="width:100%;font-size:.78rem;margin-top:.4rem" onclick="searchUnsplash()">🔍 Zoek foto's op Wikimedia</button>
           </div>
