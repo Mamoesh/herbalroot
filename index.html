@@ -3855,11 +3855,19 @@ function renderMoestuin() {
 
   async function loadFromFirebase() {
     try {
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+      const { initializeApp, getApps, getApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
       const { getFirestore, collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
 
-      const app = initializeApp(firebaseConfig, 'herbalroot-main');
-      const db  = getFirestore(app);
+      // Gebruik bestaande app instantie als die al bestaat, anders maak een nieuwe aan
+      const existingApps = getApps();
+      const appName = 'herbalroot-main';
+      let app;
+      try {
+        app = getApp(appName);
+      } catch(e) {
+        app = initializeApp(firebaseConfig, appName);
+      }
+      const db = getFirestore(app);
 
       const [kruSnap, groSnap, frSnap] = await Promise.all([
         getDocs(collection(db, 'kruiden')),
@@ -3878,16 +3886,15 @@ function renderMoestuin() {
 
       // Herrender de actieve pagina
       const activeId = (document.querySelector('.screen.active')?.id || '').replace('screen-', '');
-      if (activeId === 'kruiden' || activeId === 'home' || activeId === '') renderHerbs();
-      else if (activeId === 'groenten') renderGroenten();
-      else if (activeId === 'fruit')    renderFruit();
+      if (activeId === 'groenten') renderGroenten();
+      else if (activeId === 'fruit') renderFruit();
       else if (activeId === 'moestuin') { if(typeof renderMoestuin==='function') renderMoestuin(); }
-      // Altijd herbs updaten voor de startpagina
+      // Altijd kruiden/home updaten (startpagina)
       renderHerbs();
 
       console.log('✅ Firebase geladen:', kruiden.length, 'kruiden,', groenten.length, 'groenten,', fruit.length, 'fruit');
     } catch(e) {
-      console.warn('⚠️ Firebase niet beschikbaar, lokale data gebruikt:', e.message);
+      console.warn('⚠️ Firebase fout:', e.message);
     }
   }
 
