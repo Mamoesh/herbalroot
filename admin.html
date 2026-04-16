@@ -204,38 +204,8 @@ function renderDashboard() {
         '<button class="qa-btn" onclick="switchSection(\'recepten\');setTimeout(()=>openReceptEditor(null),50)"><span class="qa-icon">🍳</span><span>Nieuw recept</span></button>' +
         '<button class="qa-btn" onclick="window.open(\'index.html\',\'_blank\')"><span class="qa-icon">👁</span><span>Bekijk website</span></button>' +
       '</div>' +
-    '</div>' +
-    '<div style="margin-top:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem">' +
-      '<div class="dash-section-title" style="margin-bottom:.5rem">🔌 Firebase verbindingsstatus</div>' +
-      '<div id="fb-status" style="font-size:.8rem;color:var(--text-muted)">Nog niet gecontroleerd</div>' +
-      '<button class="btn-outline-sm" style="margin-top:.5rem" onclick="testFirebaseConnection()">🔍 Test verbinding</button>' +
     '</div>';
 }
-
-window.testFirebaseConnection = async () => {
-  const el = document.getElementById('fb-status');
-  if(!el) return;
-  el.innerHTML = '⏳ Testen...';
-  try {
-    // Test lezen
-    const testRead = await getDocs(collection(db,'kruiden'));
-    // Test schrijven (tijdelijk testdocument)
-    const testRef = doc(db,'_test_','connection_check');
-    await setDoc(testRef, {ts: Date.now()});
-    await deleteDoc(testRef);
-    el.innerHTML = '✅ <strong style="color:var(--green)">Verbinding OK</strong> — lezen en schrijven werken correct. Opslaan zou moeten werken.';
-  } catch(e) {
-    if(e.code==='permission-denied'||e.message.includes('Missing or insufficient permissions')){
-      el.innerHTML = '❌ <strong style="color:var(--red)">Geen schrijfrechten!</strong><br>' +
-        '<span style="font-size:.75rem">Ga naar <strong>Firebase Console → Firestore Database → Rules</strong> en vervang alles door:<br>' +
-        '<code style="background:var(--bg);padding:.2rem .4rem;border-radius:4px;display:block;margin-top:.3rem;font-size:.7rem">' +
-        "rules_version = '2';<br>service cloud.firestore {<br>&nbsp;&nbsp;match /databases/{database}/documents {<br>&nbsp;&nbsp;&nbsp;&nbsp;match /{document=**} {<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if request.auth != null;<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;}<br>}" +
-        '</code>Klik daarna op <strong>Publish</strong>.</span>';
-    } else {
-      el.innerHTML = '⚠️ Fout: ' + e.message;
-    }
-  }
-};
 
 // ── Plant raster ──────────────────────────────────────────────
 function renderSection(type) {
@@ -346,14 +316,7 @@ window.savePlant = async () => {
     const idx=(allPlants[editingType]||[]).findIndex(p=>p.id===id);
     if(idx>=0)allPlants[editingType][idx]=data;else allPlants[editingType].push(data);
     renderSection(editingType);closeEditor();toast(`${data.name||id} opgeslagen ✓`,'ok');
-  }catch(e){
-    console.error('savePlant fout:', e);
-    if(e.code==='permission-denied'||e.message.includes('Missing or insufficient permissions')){
-      alert('❌ Geen schrijfrechten in Firebase!\n\nGa naar Firebase Console → Firestore Database → Rules en zorg dat dit erin staat:\n\nrules_version = \'2\';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if request.auth != null;\n    }\n  }\n}\n\nKlik daarna op Publish.');
-    } else {
-      toast('Fout bij opslaan: '+e.message,'err');
-    }
-  }
+  }catch(e){toast('Fout: '+e.message,'err');}
 };
 
 window.deletePlant=async(id,type)=>{
@@ -448,13 +411,12 @@ window.selectPhoto=url=>{
 };
 window.previewPhotoUrl=async()=>{
   let url=document.getElementById('ed-photo-url').value.trim();
-  const preview=document.getElementById('photo-preview');
-  if(!url){preview.innerHTML='<span class="no-photo">Geen foto</span>';return;}
+  if(!url){document.getElementById('photo-preview').innerHTML='<span class="no-photo">Geen foto</span>';return;}
 
-  // Wikimedia Commons pagina-URL (bv. https://commons.wikimedia.org/wiki/File:...)
+  // Wikimedia Commons pagina-URL automatisch omzetten naar directe afbeeldingslink
   if(url.includes('commons.wikimedia.org/wiki/File:')) {
-    const fileName = decodeURIComponent(url.split('/wiki/File:')[1].split('?')[0]);
-    preview.innerHTML='<span class="no-photo">🔄 Omzetten...</span>';
+    const fileName = decodeURIComponent(url.split('/wiki/File:')[1]);
+    document.getElementById('photo-preview').innerHTML='<span class="no-photo">🔄 Omzetten...</span>';
     try {
       const res = await fetch(
         'https://en.wikipedia.org/w/api.php?action=query&titles=File:'+encodeURIComponent(fileName)+
@@ -467,16 +429,13 @@ window.previewPhotoUrl=async()=>{
         url = directUrl;
         document.getElementById('ed-photo-url').value = url;
       }
-    } catch(e) { preview.innerHTML='<span class="no-photo">Kon URL niet omzetten</span>'; return; }
+    } catch(e) {}
   }
 
-  // Toon altijd de URL als tekst zodat je ziet wat er opgeslagen wordt
-  // Laad preview met referrerpolicy=no-referrer (nodig voor Wikimedia)
-  preview.innerHTML=
-    '<div style="font-size:.65rem;color:var(--text-muted);margin-bottom:.3rem;word-break:break-all">'+url+'</div>'+
-    '<img src="'+url+'" style="max-height:130px;border-radius:8px;object-fit:cover;width:100%" referrerpolicy="no-referrer"'+
-    ' onerror="this.style.display='none';this.nextSibling.style.display='block'">' +
-    '<div style="display:none;color:var(--green);font-size:.78rem;padding:.5rem">✅ URL opgeslagen — foto wordt getoond op de website (Wikimedia blokkeert soms preview in dashboard)</div>';
+  document.getElementById('photo-preview').innerHTML=
+    `<img src="${url}" style="max-height:130px;border-radius:8px;object-fit:cover;width:100%"
+      referrerpolicy="no-referrer"
+      onerror="this.parentElement.innerHTML='<span class=no-photo>URL niet geldig — gebruik een directe afbeeldingslink die eindigt op .jpg of .png</span>'">`;
 };
 
 // ══════════════════════════════════════════════════════════════
