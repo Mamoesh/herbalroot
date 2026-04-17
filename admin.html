@@ -340,7 +340,7 @@ window.savePlant = async () => {
     ben:lines(get('ed-ben')),rec:lines(get('ed-rec')),good:csv(get('ed-good')),bad:csv(get('ed-bad')),cat:csv(get('ed-cat')),
     zaai_binnen:months(get('ed-zaai_binnen')),zaai_buiten:months(get('ed-zaai_buiten')),
     uitplanten:months(get('ed-uitplanten')),oogst:months(get('ed-oogst')),stek:months(get('ed-stek')),
-    photo:get('ed-photo-url'),pests,diseases,ph_stages:['🌱','🌿','🌸','🌼'],cp:0,watered:Date.now()};
+    photo:get('ed-photo-url'),photo2:get('ed-photo-url'),pests,diseases,ph_stages:['🌱','🌿','🌸','🌼'],cp:0,watered:Date.now()};
   try{
     await setDoc(doc(db,editingType,id),data);
     const idx=(allPlants[editingType]||[]).findIndex(p=>p.id===id);
