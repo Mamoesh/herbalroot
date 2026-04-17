@@ -1473,7 +1473,7 @@ function renderHerbs(){
   document.getElementById('herb-grid').innerHTML=list.map(h=>{
     const hl=uCats&&uCats.some(c=>h.cat.includes(c));
     const bdr=hl?'border-color:rgba(126,200,126,.6);':'';
-    const primarySrc = h.photo2||h.photo;
+    const primarySrc = h.photo||h.photo2;
     const fallbackSrc = h.photo;
     return`<div class="herb-card" data-herbid="${h.id}" style="${bdr}" onclick="openModal('${h.id}')">
       <div class="herb-card-img">
@@ -1550,7 +1550,7 @@ function openModal(id){
   document.getElementById('modal-title').textContent=h.name;
   document.getElementById('modal-latin').textContent=h.lat;
   const hero=document.getElementById('modal-hero');
-  const heroSrc=h.photo2||h.photo;
+  const heroSrc=h.photo||h.photo2;
   const heroFb=h.photo;
   hero.innerHTML=h.photo
     ?`<img src="${heroSrc}" alt="${h.name}" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover" onerror="if(this.src!==heroFb){this.src='${heroFb}'}else{this.parentElement.innerHTML='<div class=\\'modal-hero-fallback\\'>${h.emoji}</div>'}">`
@@ -3224,7 +3224,7 @@ function renderFruit() {
 function renderPlantCard(h, type) {
   const careLabel = {easy:'Weinig zorg', medium:'Matige zorg', hard:'Veel zorg'}[h.care] || h.care;
   const careBadge = {easy:'badge-easy', medium:'badge-medium', hard:'badge-hard'}[h.care] || 'badge-easy';
-  const primarySrc = h.photo2 || h.photo;
+  const primarySrc = h.photo || h.photo2;
   const fallbackSrc = h.photo;
   return '<div class="herb-card" data-herbid="' + h.id + '" onclick="openPlantModal(\'' + h.id + '\',\'' + type + '\')">' +
     '<div class="herb-card-img">' +
@@ -3249,7 +3249,7 @@ function openPlantModal(id, type) {
   if (!h) return;
   document.getElementById('modal-title').textContent = h.name;
   document.getElementById('modal-latin').textContent = h.lat;
-  const heroSrc = h.photo2 || h.photo;
+  const heroSrc = h.photo || h.photo2;
   const hero = document.getElementById('modal-hero');
   const heroFallback = '<div class="modal-hero-fallback">' + h.emoji + '</div>';
   if (h.photo) {
@@ -3683,7 +3683,7 @@ function renderSpaceSuggestions() {
       '<div class="herb-grid">' +
       suited.slice(0,12).map(h => '<div class="herb-card" onclick="openAnyModal(\'' + h.id + '\')" style="cursor:pointer">' +
         '<div class="herb-card-img">' +
-        (h.photo ? '<img src="' + (h.photo2||h.photo) + '" alt="' + h.name + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\'">' : '') +
+        (h.photo ? '<img src="' + (h.photo||h.photo2) + '" alt="' + h.name + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\'">' : '') +
         '<div class="herb-img-fallback" style="' + (h.photo?'display:none;':'') + 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3rem">' + h.emoji + '</div>' +
         '<div class="herb-badge badge-' + h.care + '">' + ({easy:'Weinig',medium:'Matig',hard:'Veel'}[h.care]) + '</div>' +
         '</div>' +
@@ -3900,6 +3900,12 @@ async function loadFromFirebase() {
     else if (activeId === 'moestuin') { if(typeof renderMoestuin==='function') renderMoestuin(); }
     renderHerbs();
 
+    // Herrender ALLE schermen zodat aanpassingen altijd zichtbaar zijn
+    renderHerbs();
+    renderGroenten();
+    renderFruit();
+    const activeNow = (document.querySelector('.screen.active')?.id||'').replace('screen-','');
+    if (activeNow==='moestuin' && typeof renderMoestuin==='function') renderMoestuin();
     console.log('✅ Firebase geladen:', kruiden.length, 'kruiden,', groenten.length, 'groenten,', fruit.length, 'fruit');
   } catch(e) {
     console.warn('⚠️ Firebase fout:', e.message);
