@@ -2497,7 +2497,6 @@ function initAuth() {
       applyLanguage(currentUser.lang||'nl');
       renderHerbs();
       // Laad Firebase data na succesvolle auth
-      if (typeof loadFromFirebase === 'function') loadFromFirebase();
     } catch(e) {
       localStorage.removeItem('hr_current_user');
       showAuthOverlay();
@@ -2546,7 +2545,6 @@ function doLogin() {
   updateNavUser();
   applyLanguage(currentUser.lang||'nl');
   renderHerbs();
-  if (typeof loadFromFirebase === 'function') loadFromFirebase();
 }
 
 function doRegister() {
@@ -2571,7 +2569,6 @@ function doRegister() {
   updateNavUser();
   applyLanguage(selectedRegLang);
   renderHerbs();
-  if (typeof loadFromFirebase === 'function') loadFromFirebase();
 }
 
 function doLogout() {
@@ -3845,76 +3842,6 @@ function renderMoestuin() {
   renderMoetuinSelected();
 }
 
-// ── Firebase: laad live plantendata ──────────────────────────────
-const firebaseConfig = {
-  apiKey:            "AIzaSyCIbxp7FemPmockRtH2Dx06yZ4_wBEfJkg",
-  authDomain:        "herbalroot.firebaseapp.com",
-  projectId:         "herbalroot",
-  storageBucket:     "herbalroot.firebasestorage.app",
-  messagingSenderId: "613071845588",
-  appId:             "1:613071845588:web:4f06139e25abeda9bee341"
-};
-
-// Globale variabele zodat we Firebase kunnen hergebruiken
-let _fbApp = null;
-let _fbDb  = null;
-
-async function initFirebase() {
-  if (_fbDb) return _fbDb;
-  try {
-    const { initializeApp, getApps, getApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-    const { getFirestore } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-    const apps = getApps();
-    _fbApp = apps.find(a => a.name === 'herbalroot-main') || initializeApp(firebaseConfig, 'herbalroot-main');
-    _fbDb  = getFirestore(_fbApp);
-  } catch(e) {
-    console.warn('Firebase init fout:', e.message);
-  }
-  return _fbDb;
-}
-
-async function loadFromFirebase() {
-  try {
-    const db = await initFirebase();
-    if (!db) return;
-    const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-
-    const [kruSnap, groSnap, frSnap] = await Promise.all([
-      getDocs(collection(db, 'kruiden')),
-      getDocs(collection(db, 'groenten')),
-      getDocs(collection(db, 'fruit')),
-    ]);
-
-    const kruiden  = kruSnap.docs.map(d => ({...d.data(), id: d.id}));
-    const groenten = groSnap.docs.map(d => ({...d.data(), id: d.id}));
-    const fruit    = frSnap.docs.map(d => ({...d.data(), id: d.id}));
-
-    if (kruiden.length)  { HERBS.length = 0;   kruiden.forEach(p => HERBS.push(p)); }
-    if (groenten.length) { GROENTEN.length = 0; groenten.forEach(p => GROENTEN.push(p)); }
-    if (fruit.length)    { FRUIT.length = 0;    fruit.forEach(p => FRUIT.push(p)); }
-
-    // Herrender de actieve pagina
-    const activeId = (document.querySelector('.screen.active')?.id || '').replace('screen-', '');
-    if      (activeId === 'groenten') renderGroenten();
-    else if (activeId === 'fruit')    renderFruit();
-    else if (activeId === 'moestuin') { if(typeof renderMoestuin==='function') renderMoestuin(); }
-    renderHerbs();
-
-    // Herrender ALLE schermen zodat aanpassingen altijd zichtbaar zijn
-    renderHerbs();
-    renderGroenten();
-    renderFruit();
-    const activeNow = (document.querySelector('.screen.active')?.id||'').replace('screen-','');
-    if (activeNow==='moestuin' && typeof renderMoestuin==='function') renderMoestuin();
-    console.log('✅ Firebase geladen:', kruiden.length, 'kruiden,', groenten.length, 'groenten,', fruit.length, 'fruit');
-  } catch(e) {
-    console.warn('⚠️ Firebase fout:', e.message);
-  }
-}
-
-// Start Firebase laden direct (arrays zijn al gedefinieerd hierboven)
-loadFromFirebase();
-
 // ── PWA: Register Service Worker ──────────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -3938,5 +3865,80 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
+
+<!-- Firebase module: laadt plantendata na login -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCIbxp7FemPmockRtH2Dx06yZ4_wBEfJkg",
+  authDomain:        "herbalroot.firebaseapp.com",
+  projectId:         "herbalroot",
+  storageBucket:     "herbalroot.firebasestorage.app",
+  messagingSenderId: "613071845588",
+  appId:             "1:613071845588:web:4f06139e25abeda9bee341"
+};
+
+const app = initializeApp(firebaseConfig, 'herbalroot-viewer');
+const db  = getFirestore(app);
+
+async function laadFirebaseData() {
+  try {
+    const [kSnap, gSnap, fSnap] = await Promise.all([
+      getDocs(collection(db, 'kruiden')),
+      getDocs(collection(db, 'groenten')),
+      getDocs(collection(db, 'fruit')),
+    ]);
+
+    const kruiden  = kSnap.docs.map(d => ({...d.data(), id: d.id}));
+    const groenten = gSnap.docs.map(d => ({...d.data(), id: d.id}));
+    const fruit    = fSnap.docs.map(d => ({...d.data(), id: d.id}));
+
+    if (kruiden.length)  { HERBS.length = 0;   kruiden.forEach(p => HERBS.push(p)); }
+    if (groenten.length) { GROENTEN.length = 0; groenten.forEach(p => GROENTEN.push(p)); }
+    if (fruit.length)    { FRUIT.length = 0;    fruit.forEach(p => FRUIT.push(p)); }
+
+    // Herrender alle actieve schermen
+    if (typeof renderHerbs    === 'function') renderHerbs();
+    if (typeof renderGroenten === 'function') renderGroenten();
+    if (typeof renderFruit    === 'function') renderFruit();
+
+    console.log('Firebase data geladen:', kruiden.length, 'kruiden,', groenten.length, 'groenten,', fruit.length, 'fruit');
+  } catch(e) {
+    console.warn('Firebase fout:', e.message);
+  }
+}
+
+// Wacht tot de auth overlay verborgen is, dan laad data
+function wachtOpLogin() {
+  const overlay = document.getElementById('auth-overlay');
+  if (!overlay) { laadFirebaseData(); return; }
+
+  const observer = new MutationObserver(() => {
+    const hidden = overlay.style.display === 'none' || !overlay.offsetParent;
+    if (hidden) {
+      observer.disconnect();
+      // Kleine vertraging zodat de app volledig geladen is
+      setTimeout(laadFirebaseData, 300);
+    }
+  });
+
+  // Check meteen of overlay al verborgen is
+  const hidden = overlay.style.display === 'none' || !overlay.offsetParent;
+  if (hidden) {
+    laadFirebaseData();
+  } else {
+    observer.observe(overlay, { attributes: true, attributeFilter: ['style'] });
+  }
+}
+
+// Start zodra DOM klaar is
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wachtOpLogin);
+} else {
+  wachtOpLogin();
+}
+</script>
 </body>
 </html>
