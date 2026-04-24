@@ -1007,7 +1007,7 @@ window.saveTheme=async()=>{
 
 // ── Recepten ──────────────────────────────────────────────────
 function renderRecepten() {
-  const cats={koken:'🍽 Koken',soep:'🥣 Soepen',drank:'🥤 Dranken',thee:'🍵 Thee',dessert:'🍰 Desserts'};
+  const cats={gerecht:'🍽 Gerechten',soep:'🥣 Soepen',drank:'🥤 Dranken',thee:'🍵 Thee',dessert:'🍰 Desserts',verzorging:'✨ Verzorging'};
   const keys=Object.keys(allRecepten);
   document.getElementById('main-panel').innerHTML=`
     <div class="page-title-row">
@@ -1025,7 +1025,7 @@ function renderRecepten() {
 let receptFilter='all';
 window.filterReceptAdmin=(cat,btn)=>{receptFilter=cat;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderReceptList(cat);};
 function renderReceptList(cat){
-  const cats={koken:'🍽',soep:'🥣',drank:'🥤',thee:'🍵',dessert:'🍰'};
+  const cats={gerecht:'🍽',soep:'🥣',drank:'🥤',thee:'🍵',dessert:'🍰',verzorging:'✨'};
   const entries=Object.entries(allRecepten).filter(([,v])=>cat==='all'||v.cat===cat).sort(([a],[b])=>a.localeCompare(b));
   document.getElementById('recept-list').innerHTML=entries.map(([naam,r])=>`
     <div class="list-row">
@@ -1056,13 +1056,53 @@ window.saveRecept=async()=>{
   const naam=get('re-naam').trim();if(!naam){toast('Vul een naam in.','err');return;}
   const safeId=naam.replace(/\//g,'_sl_').replace(/\\/g,'_bs_').replace(/\./g,'_dt_').replace(/\s+/g,'_').substring(0,500);
   const data={naam,cat:get('re-cat'),herbId:get('re-herbid'),tijd:get('re-tijd'),porties:get('re-porties'),moeilijk:get('re-moeilijk'),intro:get('re-intro'),ingredienten:get('re-ingredienten').split('\n').map(x=>x.trim()).filter(Boolean),methode:get('re-methode').split('\n').map(x=>x.trim()).filter(Boolean),tip:get('re-tip')};
-  try{await setDoc(doc(db,'recepten',safeId),data);allRecepten[naam]=data;closeReceptEditor();renderRecepten();toast(`${naam} opgeslagen ✓`,'ok');}
+  try{
+    await setDoc(doc(db,'recepten',safeId),data);
+    allRecepten[naam]=data;
+
+    // Voeg receptnaam toe aan de plant's rec-array als die er nog niet in staat
+    const herbId = get('re-herbid').trim();
+    if(herbId) {
+      const plantType = ['kruiden','groenten','fruit'].find(t => (allPlants[t]||[]).find(p=>p.id===herbId));
+      if(plantType) {
+        const plant = allPlants[plantType].find(p=>p.id===herbId);
+        if(plant && !(plant.rec||[]).includes(naam)) {
+          plant.rec = [...(plant.rec||[]), naam];
+          await setDoc(doc(db,plantType,herbId), plant);
+          toast(`${naam} opgeslagen ✓ en toegevoegd aan ${plant.name}`,'ok');
+        } else {
+          toast(`${naam} opgeslagen ✓`,'ok');
+        }
+      } else {
+        toast(`${naam} opgeslagen ✓`,'ok');
+      }
+    } else {
+      toast(`${naam} opgeslagen ✓`,'ok');
+    }
+
+    closeReceptEditor();renderRecepten();
+  }
   catch(e){toast('Fout: '+e.message,'err');}
 };
 window.deleteRecept=async(naam)=>{
-  if(!confirm(`"${naam}" verwijderen?`))return;
+  if(!confirm(`"${naam}" verwijderen? Dit verwijdert het ook uit de inhoudspagina van de plant.`))return;
   const safeId=naam.replace(/\//g,'_sl_').replace(/\\/g,'_bs_').replace(/\./g,'_dt_').replace(/\s+/g,'_').substring(0,500);
-  try{await deleteDoc(doc(db,'recepten',safeId));delete allRecepten[naam];renderRecepten();toast(`${naam} verwijderd`,'ok');}
+  try{
+    await deleteDoc(doc(db,'recepten',safeId));
+    delete allRecepten[naam];
+
+    // Verwijder ook uit plant's rec-array
+    for(const plantType of ['kruiden','groenten','fruit']){
+      for(const plant of (allPlants[plantType]||[])){
+        if((plant.rec||[]).includes(naam)){
+          plant.rec = plant.rec.filter(r=>r!==naam);
+          await setDoc(doc(db,plantType,plant.id), plant);
+        }
+      }
+    }
+
+    renderRecepten();toast(`${naam} verwijderd van recepten en planten`,'ok');
+  }
   catch(e){toast('Fout: '+e.message,'err');}
 };
 
@@ -1765,7 +1805,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="fgrid">
         <div class="fg full"><label>Naam *</label><input id="re-naam" placeholder="bijv. Mojito"><span class="hint">Unieke naam — niet wijzigen na aanmaken</span></div>
         <div class="fg"><label>Categorie</label>
-          <select id="re-cat"><option value="koken">🍽 Koken</option><option value="soep">🥣 Soep</option><option value="drank">🥤 Drank</option><option value="thee">🍵 Thee</option><option value="dessert">🍰 Dessert</option></select></div>
+          <select id="re-cat">
+              <option value="gerecht">🍽 Gerecht</option>
+              <option value="soep">🥣 Soep</option>
+              <option value="drank">🥤 Drank & Cocktail</option>
+              <option value="thee">🍵 Thee & Infusie</option>
+              <option value="dessert">🍰 Dessert</option>
+              <option value="verzorging">✨ Verzorgingsproduct</option>
+            </select></div>
         <div class="fg"><label>Plant/kruid ID</label><input id="re-herbid" placeholder="bijv. munt"></div>
         <div class="fg"><label>Bereidingstijd</label><input id="re-tijd" placeholder="15 min"></div>
         <div class="fg"><label>Porties</label><input id="re-porties" placeholder="4 porties"></div>
