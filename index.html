@@ -352,7 +352,7 @@ select option{background:var(--surface2);}
       <div class="auth-error" id="login-error"></div>
       <div class="auth-field"><label>E-mailadres</label><input type="email" id="login-email" placeholder="jouw@email.be" autocomplete="email"></div>
       <div class="auth-field"><label>Wachtwoord</label><input type="password" id="login-pw" placeholder="••••••••" autocomplete="current-password"></div>
-      <button class="btn" style="width:100%;margin-top:.5rem" onclick="doLogin()">Aanmelden →</button>
+      <button class="btn" id="login-btn" style="width:100%;margin-top:.5rem" onclick="doLogin()">Aanmelden →</button>
       <p style="text-align:center;margin-top:.75rem;font-size:.78rem;color:var(--text2)">Nog geen account? <span style="color:var(--accent);cursor:pointer" onclick="switchAuthTab('register')">Registreer hier</span></p>
     </div>
     <!-- REGISTER -->
@@ -385,7 +385,7 @@ select option{background:var(--surface2);}
         <input type="checkbox" id="tc-agree">
         <span>Ik heb de gebruiksvoorwaarden gelezen en ga akkoord. Ik begrijp dat HerbalRoot geen medisch advies geeft.</span>
       </label>
-      <button class="btn" style="width:100%;margin-top:.25rem" onclick="doRegister()">Account aanmaken →</button>
+      <button class="btn" id="register-btn" style="width:100%;margin-top:.25rem" onclick="doRegister()">Account aanmaken →</button>
       <p style="text-align:center;margin-top:.75rem;font-size:.78rem;color:var(--text2)">Al een account? <span style="color:var(--accent);cursor:pointer" onclick="switchAuthTab('login')">Aanmelden</span></p>
     </div>
   </div>
@@ -2559,6 +2559,7 @@ function goToReceptFromModal(herbId, receptNaam) {
 let currentUser = null;
 
 function initAuth() {
+  // Toon meteen iets via localStorage (geen flicker)
   const stored = localStorage.getItem('hr_current_user');
   if (stored) {
     try {
@@ -2567,14 +2568,45 @@ function initAuth() {
       updateNavUser();
       applyLanguage(currentUser.lang||'nl');
       renderHerbs();
-      // Laad Firebase data na succesvolle auth
-    } catch(e) {
-      localStorage.removeItem('hr_current_user');
-      showAuthOverlay();
-    }
-  } else {
-    showAuthOverlay();
+    } catch(e) { localStorage.removeItem('hr_current_user'); }
   }
+  // Verifieer via Firebase Authentication
+  (async () => {
+    try {
+      const auth = await getFirebaseAuth();
+      const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+      onAuthStateChanged(auth, async (fbUser) => {
+        if (fbUser) {
+          try {
+            const db = await getFirebaseDb();
+            const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+            const snap = await getDoc(doc(db,'users',fbUser.uid));
+            const profile = snap.exists() ? snap.data() : {};
+            currentUser = {
+              uid: fbUser.uid, email: fbUser.email,
+              name: profile.name||fbUser.displayName||fbUser.email.split('@')[0],
+              bio: profile.bio||'', location: profile.location||'',
+              avatar: profile.avatar||fbUser.photoURL||'',
+              joined: profile.joined||new Date().toLocaleDateString('nl-BE'),
+              lang: profile.lang||'nl',
+            };
+            localStorage.setItem('hr_current_user', JSON.stringify(currentUser));
+          } catch(e) {}
+          hideAuthOverlay();
+          updateNavUser();
+          applyLanguage(currentUser?.lang||'nl');
+          renderHerbs();
+          if (typeof laadFirebaseData === 'function') laadFirebaseData();
+        } else {
+          currentUser = null;
+          localStorage.removeItem('hr_current_user');
+          showAuthOverlay();
+        }
+      });
+    } catch(e) {
+      if (!currentUser) showAuthOverlay();
+    }
+  })();
 }
 
 function showAuthOverlay() {
@@ -2594,56 +2626,149 @@ function switchAuthTab(tab) {
   document.getElementById('auth-register').classList.toggle('active', tab==='register');
 }
 
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem('hr_users')||'{}'); } catch(e){ return {}; }
-}
-function saveUsers(users) { localStorage.setItem('hr_users', JSON.stringify(users)); }
+// ── Firebase Auth login/register/logout ──────────────────────
+// Werkt via Firebase Authentication + Firestore voor gebruikersprofiel
 
-function doLogin() {
+async function getFirebaseAuth() {
+  const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+  const { initializeApp, getApps, getApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+  const fbConfig = {
+    apiKey:"AIzaSyCIbxp7FemPmockRtH2Dx06yZ4_wBEfJkg",
+    authDomain:"herbalroot.firebaseapp.com",
+    projectId:"herbalroot",
+    storageBucket:"herbalroot.firebasestorage.app",
+    messagingSenderId:"613071845588",
+    appId:"1:613071845588:web:4f06139e25abeda9bee341"
+  };
+  const app = getApps().find(a=>a.name==='herbalroot-viewer') || initializeApp(fbConfig,'herbalroot-viewer');
+  return getAuth(app);
+}
+
+async function getFirebaseDb() {
+  const { getFirestore } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+  const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+  const fbConfig = {
+    apiKey:"AIzaSyCIbxp7FemPmockRtH2Dx06yZ4_wBEfJkg",
+    authDomain:"herbalroot.firebaseapp.com",
+    projectId:"herbalroot",
+    storageBucket:"herbalroot.firebasestorage.app",
+    messagingSenderId:"613071845588",
+    appId:"1:613071845588:web:4f06139e25abeda9bee341"
+  };
+  const app = getApps().find(a=>a.name==='herbalroot-viewer') || initializeApp(fbConfig,'herbalroot-viewer');
+  return getFirestore(app);
+}
+
+function setLoginLoading(loading) {
+  const btn = document.getElementById('login-btn');
+  if (btn) btn.textContent = loading ? 'Aanmelden…' : 'Aanmelden →';
+  if (btn) btn.disabled = loading;
+}
+function setRegisterLoading(loading) {
+  const btn = document.getElementById('register-btn');
+  if (btn) btn.textContent = loading ? 'Bezig…' : 'Account aanmaken →';
+  if (btn) btn.disabled = loading;
+}
+
+async function doLogin() {
   const email = document.getElementById('login-email').value.trim().toLowerCase();
-  const pw = document.getElementById('login-pw').value;
-  const err = document.getElementById('login-error');
+  const pw    = document.getElementById('login-pw').value;
+  const err   = document.getElementById('login-error');
   err.classList.remove('show');
-  if (!email || !pw) { err.textContent='Vul alle velden in.'; err.classList.add('show'); return; }
-  const users = getUsers();
-  const user = users[email];
-  if (!user || user.pw !== btoa(pw)) {
-    err.textContent='E-mail of wachtwoord incorrect.'; err.classList.add('show'); return;
+  if (!email||!pw) { err.textContent='Vul alle velden in.'; err.classList.add('show'); return; }
+  setLoginLoading(true);
+  try {
+    const auth = await getFirebaseAuth();
+    const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+    const result = await signInWithEmailAndPassword(auth, email, pw);
+    const fbUser = result.user;
+    // Laad profiel uit Firestore
+    const db = await getFirebaseDb();
+    const { doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const profileSnap = await getDoc(doc(db, 'users', fbUser.uid));
+    const profile = profileSnap.exists() ? profileSnap.data() : {};
+    currentUser = {
+      email: fbUser.email,
+      uid: fbUser.uid,
+      name: profile.name || fbUser.displayName || email.split('@')[0],
+      bio: profile.bio||'',
+      location: profile.location||'',
+      avatar: profile.avatar||fbUser.photoURL||'',
+      joined: profile.joined || new Date().toLocaleDateString('nl-BE'),
+      lang: profile.lang||'nl',
+    };
+    localStorage.setItem('hr_current_user', JSON.stringify(currentUser));
+    hideAuthOverlay();
+    updateNavUser();
+    applyLanguage(currentUser.lang||'nl');
+    renderHerbs();
+    if (typeof laadFirebaseData === 'function') laadFirebaseData();
+  } catch(e) {
+    const msg = e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
+      ? 'E-mail of wachtwoord incorrect.'
+      : e.code === 'auth/too-many-requests'
+      ? 'Te veel pogingen. Probeer later opnieuw.'
+      : 'Aanmelden mislukt: ' + e.message;
+    err.textContent = msg;
+    err.classList.add('show');
   }
-  currentUser = { email, name:user.name, bio:user.bio||'', location:user.location||'', avatar:user.avatar||'', joined:user.joined, lang:user.lang||'nl' };
-  localStorage.setItem('hr_current_user', JSON.stringify(currentUser));
-  hideAuthOverlay();
-  updateNavUser();
-  applyLanguage(currentUser.lang||'nl');
-  renderHerbs();
+  setLoginLoading(false);
 }
 
-function doRegister() {
-  const name  = document.getElementById('reg-name').value.trim();
-  const email = document.getElementById('reg-email').value.trim().toLowerCase();
-  const pw    = document.getElementById('reg-pw').value;
-  const agreed= document.getElementById('tc-agree').checked;
-  const err   = document.getElementById('register-error');
+async function doRegister() {
+  const name   = document.getElementById('reg-name').value.trim();
+  const email  = document.getElementById('reg-email').value.trim().toLowerCase();
+  const pw     = document.getElementById('reg-pw').value;
+  const agreed = document.getElementById('tc-agree').checked;
+  const err    = document.getElementById('register-error');
   err.classList.remove('show');
   if (!name||!email||!pw) { err.textContent='Vul alle velden in.'; err.classList.add('show'); return; }
   if (pw.length < 6) { err.textContent='Wachtwoord moet minimaal 6 tekens zijn.'; err.classList.add('show'); return; }
   if (!agreed) { err.textContent='Je moet akkoord gaan met de gebruiksvoorwaarden.'; err.classList.add('show'); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent='Ongeldig e-mailadres.'; err.classList.add('show'); return; }
-  const users = getUsers();
-  if (users[email]) { err.textContent='Dit e-mailadres is al in gebruik.'; err.classList.add('show'); return; }
-  const newUser = { name, pw:btoa(pw), bio:'', location:'', avatar:'', joined:new Date().toLocaleDateString('nl-BE'), lang:selectedRegLang };
-  users[email] = newUser;
-  saveUsers(users);
-  currentUser = { email, name, bio:'', location:'', avatar:'', joined:newUser.joined, lang:selectedRegLang };
-  localStorage.setItem('hr_current_user', JSON.stringify(currentUser));
-  hideAuthOverlay();
-  updateNavUser();
-  applyLanguage(selectedRegLang);
-  renderHerbs();
+  setRegisterLoading(true);
+  try {
+    const auth = await getFirebaseAuth();
+    const { createUserWithEmailAndPassword, updateProfile } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+    const result = await createUserWithEmailAndPassword(auth, email, pw);
+    const fbUser = result.user;
+    await updateProfile(fbUser, { displayName: name });
+    // Sla profiel op in Firestore
+    const db = await getFirebaseDb();
+    const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const profile = {
+      name, email, bio:'', location:'', avatar:'',
+      joined: new Date().toLocaleDateString('nl-BE'),
+      lang: selectedRegLang||'nl',
+      land: document.getElementById('s-land')?.value||'be',
+    };
+    await setDoc(doc(db,'users', fbUser.uid), profile);
+    currentUser = { ...profile, uid: fbUser.uid };
+    localStorage.setItem('hr_current_user', JSON.stringify(currentUser));
+    hideAuthOverlay();
+    updateNavUser();
+    applyLanguage(currentUser.lang||'nl');
+    renderHerbs();
+    if (typeof laadFirebaseData === 'function') laadFirebaseData();
+  } catch(e) {
+    const msg = e.code === 'auth/email-already-in-use'
+      ? 'Dit e-mailadres is al in gebruik.'
+      : e.code === 'auth/weak-password'
+      ? 'Wachtwoord is te zwak.'
+      : 'Registratie mislukt: ' + e.message;
+    err.textContent = msg;
+    err.classList.add('show');
+  }
+  setRegisterLoading(false);
 }
 
-function doLogout() {
+async function doLogout() {
   if (!confirm('Wil je uitloggen?')) return;
+  try {
+    const auth = await getFirebaseAuth();
+    const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+    await signOut(auth);
+  } catch(e) {}
   currentUser = null;
   localStorage.removeItem('hr_current_user');
   showAuthOverlay();
@@ -4008,6 +4133,9 @@ function wachtOpLogin() {
     observer.observe(overlay, { attributes: true, attributeFilter: ['style'] });
   }
 }
+
+// Maak laadFirebaseData globaal beschikbaar
+window.laadFirebaseData = laadFirebaseData;
 
 // Start zodra DOM klaar is
 if (document.readyState === 'loading') {
