@@ -4170,24 +4170,24 @@ function renderProfielMoestuin() {
           '<div style="display:flex;align-items:center;gap:.4rem;margin-top:.15rem">' +
             '<span style="font-size:.68rem;background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:.1rem .5rem;color:var(--text2)">📍 ' + (entry.locatie||'Onbekend') + '</span>' +
             '<label style="font-size:.65rem;color:var(--text2);display:flex;align-items:center;gap:.25rem;cursor:pointer">' +
-              '<input type="checkbox" ' + (entry.publiek?'checked':'') + ' onchange="updateMoetuinField('' + eid + '','publiek',this.checked)" style="accent-color:var(--accent)"> Publiek' +
+              '<input type="checkbox" ' + (entry.publiek?'checked':'') + ' onchange="updateMoetuinField(\''  + eid + '\',\'publiek\',this.checked)" style="accent-color:var(--accent)"> Publiek' +
             '</label>' +
           '</div>' +
         '</div>' +
-        '<button onclick="removeMoetuinEntry('' + eid + '')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:1rem;padding:.2rem" title="Verwijderen">🗑</button>' +
+        '<button onclick="removeMoetuinEntry(\'' + eid + '\')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:1rem;padding:.2rem" title="Verwijderen">🗑</button>' +
       '</div>' +
       '<div class="moestuin-plant-card-body">' +
         '<div class="moestuin-date-row">' +
-          '<div class="moestuin-date-field"><label>🌱 Gezaaid</label><input type="date" value="' + (entry.zaaidatum||'') + '" onchange="updateMoetuinField('' + eid + '','zaaidatum',this.value)"></div>' +
-          '<div class="moestuin-date-field"><label>🪴 Uitgeplant</label><input type="date" value="' + (entry.uitplantdatum||'') + '" onchange="updateMoetuinField('' + eid + '','uitplantdatum',this.value)"></div>' +
+          '<div class="moestuin-date-field"><label>🌱 Gezaaid</label><input type="date" value="' + (entry.zaaidatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'zaaidatum\',this.value)"></div>' +
+          '<div class="moestuin-date-field"><label>🪴 Uitgeplant</label><input type="date" value="' + (entry.uitplantdatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'uitplantdatum\',this.value)"></div>' +
         '</div>' +
         '<div class="moestuin-date-row">' +
-          '<div class="moestuin-date-field"><label>🌾 Geoogst</label><input type="date" value="' + (entry.oogstdatum||'') + '" onchange="updateMoetuinField('' + eid + '','oogstdatum',this.value)"></div>' +
-          '<div class="moestuin-date-field"><label>💧 Gegoten</label><input type="date" value="' + (entry.waterdatum||'') + '" onchange="updateMoetuinField('' + eid + '','waterdatum',this.value)"></div>' +
+          '<div class="moestuin-date-field"><label>🌾 Geoogst</label><input type="date" value="' + (entry.oogstdatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'oogstdatum\',this.value)"></div>' +
+          '<div class="moestuin-date-field"><label>💧 Gegoten</label><input type="date" value="' + (entry.waterdatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'waterdatum\',this.value)"></div>' +
         '</div>' +
-        '<textarea class="moestuin-notes" placeholder="Notities…" onchange="updateMoetuinField('' + eid + '','notities',this.value)">' + (entry.notities||'') + '</textarea>' +
+        '<textarea class="moestuin-notes" placeholder="Notities…" onchange="updateMoetuinField(\'' + eid + '\',\'notities\',this.value)">' + (entry.notities||'') + '</textarea>' +
         '<div class="moestuin-date-field" style="margin-top:.4rem"><label>📸 Eigen foto URL</label>' +
-        '<input type="text" value="' + (entry.foto||'') + '" placeholder="https://..." style="width:100%;padding:.35rem .5rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.75rem;outline:none" onchange="updateMoetuinField('' + eid + '','foto',this.value)"></div>' +
+        '<input type="text" value="' + (entry.foto||'') + '" placeholder="https://..." style="width:100%;padding:.35rem .5rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.75rem;outline:none" onchange="updateMoetuinField(\'' + eid + '\',\'foto\',this.value)"></div>' +
       '</div>' +
     '</div>';
   }).join('');
