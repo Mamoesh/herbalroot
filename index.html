@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
-<title>HerbalRoot – Kweek je eigen kruiden</title>
+<title>Kweekwijs – Jouw persoonlijke moestuingids</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="HerbalRoot">
+<meta name="apple-mobile-web-app-title" content="Kweekwijs">
 <link rel="apple-touch-icon" href="icons/icon-192x192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png">
@@ -360,7 +360,7 @@ select option{background:var(--surface2);}
 </head>
 <body>
 <header>
-  <div class="logo">🌿 Herbal<span>Root</span></div>
+  <div class="logo">🌱 Kweek<span>wijs</span></div>
   <nav>
     <button class="active" onclick="go('home')" id="nav-home">🏡 <span>Start</span></button>
     <button onclick="go('groenten')" id="nav-groenten">🥦 <span>Groenten</span></button>
@@ -377,7 +377,7 @@ select option{background:var(--surface2);}
 <!-- AUTH OVERLAY -->
 <div class="auth-overlay" id="auth-overlay">
   <div class="auth-box">
-    <div class="auth-logo">🌿 Herbal<span>Root</span></div>
+    <div class="auth-logo">🌱 Kweek<span>wijs</span></div>
     <div class="auth-sub">Jouw persoonlijk moestuin-assistent</div>
     <div class="auth-tabs">
       <div class="auth-tab active" onclick="switchAuthTab('login')">Aanmelden</div>
@@ -434,20 +434,20 @@ select option{background:var(--surface2);}
       </div>
       <div class="tc-box">
         <strong>Gebruiksvoorwaarden & Disclaimer</strong><br><br>
-        Door HerbalRoot te gebruiken ga je akkoord met het volgende:<br><br>
+        Door Kweekwijs te gebruiken ga je akkoord met het volgende:<br><br>
         <strong>⚕️ Geen medisch advies</strong><br>
-        De informatie in HerbalRoot is uitsluitend bedoeld voor educatieve en informatieve doeleinden. HerbalRoot biedt <strong>geen medisch advies</strong>, diagnoses of behandelingen. De beschreven voordelen van kruiden zijn algemene volksgezondheid- en traditie-informatie — <strong>geen vervanging voor professioneel medisch advies</strong>.<br><br>
-        Bij ziekte, kwalen of gezondheidsproblemen raadpleeg je altijd een arts of gekwalificeerd zorgverlener. Stop nooit met medicatie of behandeling op basis van informatie uit HerbalRoot.<br><br>
+        De informatie in Kweekwijs is uitsluitend bedoeld voor educatieve en informatieve doeleinden. Kweekwijs biedt <strong>geen medisch advies</strong>, diagnoses of behandelingen. De beschreven voordelen van kruiden zijn algemene volksgezondheid- en traditie-informatie — <strong>geen vervanging voor professioneel medisch advies</strong>.<br><br>
+        Bij ziekte, kwalen of gezondheidsproblemen raadpleeg je altijd een arts of gekwalificeerd zorgverlener. Stop nooit met medicatie of behandeling op basis van informatie uit Kweekwijs.<br><br>
         <strong>🌿 Plantgebruik</strong><br>
         Doe altijd een allergietest voor je nieuwe kruiden gebruikt. Zwangere vrouwen, zogende moeders en mensen met chronische ziekten raadplegen hun arts voor gebruik van kruiden.<br><br>
         <strong>👤 Privacy & Community</strong><br>
         Je gegevens worden lokaal opgeslagen op jouw apparaat. Community-berichten zijn zichtbaar voor andere gebruikers. Respecteer andere gebruikers en deel geen persoonlijke informatie van derden.<br><br>
         <strong>📋 Aansprakelijkheid</strong><br>
-        HerbalRoot is niet aansprakelijk voor schade voortvloeiend uit het gebruik van informatie op dit platform. Gebruik van de app is volledig op eigen risico.
+        Kweekwijs is niet aansprakelijk voor schade voortvloeiend uit het gebruik van informatie op dit platform. Gebruik van de app is volledig op eigen risico.
       </div>
       <label class="tc-check">
         <input type="checkbox" id="tc-agree">
-        <span>Ik heb de gebruiksvoorwaarden gelezen en ga akkoord. Ik begrijp dat HerbalRoot geen medisch advies geeft.</span>
+        <span>Ik heb de gebruiksvoorwaarden gelezen en ga akkoord. Ik begrijp dat Kweekwijs geen medisch advies geeft.</span>
       </label>
       <button class="btn" id="register-btn" style="width:100%;margin-top:.25rem" onclick="doRegister()">Account aanmaken →</button>
       <div style="display:flex;align-items:center;gap:.75rem;margin:.75rem 0">
@@ -482,42 +482,19 @@ select option{background:var(--surface2);}
     </div>
     <div class="step active" id="step-0">
       <div class="card">
-        <h2>📍 Jouw locatie</h2><p class="sub">Kies hoe je jouw locatie wil opgeven.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.25rem">
-          <button type="button" class="geo-choice-btn" id="geo-auto-btn" onclick="selectGeoMethod('auto')">
-            <div class="geo-choice-icon">📡</div>
-            <div class="geo-choice-label">Automatisch detecteren</div>
-            <div class="geo-choice-sub">Via GPS of IP-adres</div>
+        <h2>🌍 Jouw land</h2><p class="sub">Kweekwijs is beschikbaar voor België en Nederland.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.5rem" id="tg-land">
+          <button type="button" class="geo-choice-btn" id="land-be-btn" onclick="selectLand('be',this)">
+            <div class="geo-choice-icon">🇧🇪</div>
+            <div class="geo-choice-label">België</div>
           </button>
-          <button type="button" class="geo-choice-btn" id="geo-manual-btn" onclick="selectGeoMethod('manual')">
-            <div class="geo-choice-icon">🗺</div>
-            <div class="geo-choice-label">Land zelf kiezen</div>
-            <div class="geo-choice-sub">Kies uit de lijst</div>
+          <button type="button" class="geo-choice-btn" id="land-nl-btn" onclick="selectLand('nl',this)">
+            <div class="geo-choice-icon">🇳🇱</div>
+            <div class="geo-choice-label">Nederland</div>
           </button>
         </div>
-        <div id="geo-auto-section" style="display:none">
-          <button type="button" class="btn" onclick="useGeoLocation()" id="geo-btn" style="width:100%;margin-bottom:.75rem;font-size:.85rem;padding:.65rem 1rem">
-            📡 Mijn locatie detecteren
-          </button>
-          <div id="geo-status" style="font-size:.78rem;color:var(--text2);min-height:1.2rem"></div>
-        </div>
-        <div id="geo-manual-section" style="display:none">
-          <label>Land / Regio</label>
-          <select id="s-land">
-            <option value="">— Kies jouw land —</option>
-            <option value="be">🇧🇪 België</option>
-            <option value="nl">🇳🇱 Nederland</option>
-            <option value="de">🇩🇪 Duitsland</option>
-            <option value="fr">🇫🇷 Frankrijk</option>
-          </select>
-          <label>Klimaatzone</label>
-          <input type="text" id="s-klimaat" readonly placeholder="Wordt ingevuld na landkeuze" style="color:var(--text2)">
-        </div>
-        <div id="geo-result-section" style="display:none;background:var(--surface2);border-radius:10px;padding:.9rem 1rem;margin-top:.5rem">
-          <div id="geo-result-text" style="font-size:.9rem;color:var(--text)"></div>
-          <div id="geo-result-sub" style="font-size:.78rem;color:var(--text2);margin-top:.2rem"></div>
-          <button type="button" onclick="selectGeoMethod('manual')" style="margin-top:.6rem;font-size:.75rem;color:var(--text2);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0">Toch handmatig kiezen</button>
-        </div>
+        <input type="hidden" id="s-land" value="">
+        <input type="hidden" id="s-klimaat" value="">
       </div>
       <div class="step-nav"><span></span><button class="btn" onclick="ns(0)">Volgende →</button></div>
     </div>
@@ -1429,6 +1406,16 @@ function go(id){
 // ═══════════════════════════════════════
 function startSetup(){document.getElementById('hero-section').style.display='none';document.getElementById('wizard-section').style.display='block';}
 function loadDemo(){UP={land:'be',klimaat:KL.be,type:'Balkon',ori:'Zuid',medium:'Potten',m2:'4',cats:['koken','thee','huidverzorging','insecten'],tijd:'Matig',done:true};go('kruiden');}
+function selectLand(code, btn) {
+  document.querySelectorAll('#tg-land .geo-choice-btn').forEach(b => b.style.borderColor = 'var(--border)');
+  btn.style.borderColor = 'var(--accent)';
+  btn.style.background = 'rgba(126,200,126,.08)';
+  document.getElementById('s-land').value = code;
+  document.getElementById('s-klimaat').value = KL[code]||'Gematigd oceaanklimaat (Cfb)';
+  UP.land = code;
+  UP.klimaat = KL[code]||'Gematigd oceaanklimaat (Cfb)';
+}
+
 function ns(i){
   if(i===0){
     // Accept geo result OR manual land selection
@@ -1436,8 +1423,8 @@ function ns(i){
       // Geo was used — land already set in UP
     } else {
       const l=document.getElementById('s-land')?document.getElementById('s-land').value:'';
-      if(!l){alert('Kies je locatie: gebruik automatische detectie of selecteer een land.');return;}
-      UP.land=l;UP.klimaat=KL[l]||'Onbekend';
+      if(!l){alert('Kies je land: België of Nederland.');return;}
+      UP.land=l;UP.klimaat=KL[l]||'Gematigd oceaanklimaat (Cfb)';
     }
   }
   if(i===1){
@@ -1499,7 +1486,7 @@ function buildSum(){
     `🌱 <b>Interesses</b>: ${cleanCats.join(', ')||'Alles'}<br>`+
     `⏱ <b>Tijd</b>: ${cleanTijd}`;
 }
-document.getElementById('s-land').addEventListener('change',function(){document.getElementById('s-klimaat').value=KL[this.value]||'';});
+      // s-land is now a hidden field, selectLand handles updates
 function ts(el,gid){document.querySelectorAll('#'+gid+' .toggle').forEach(t=>t.classList.remove('selected'));el.classList.add('selected');}
 function tm(el){el.classList.toggle('selected');}
 function stripToggleEmoji(s){
@@ -1539,7 +1526,7 @@ function renderHerbs(){
   document.getElementById('herb-grid').innerHTML=list.map(h=>{
     const hl=uCats&&uCats.some(c=>h.cat.includes(c));
     const bdr=hl?'border-color:rgba(126,200,126,.6);':'';
-    const primarySrc = h.photo||h.photo2;
+    const primarySrc = h.photo||(h.photo2&&!h.photo2.includes('600px')?h.photo2:'');
     const fallbackSrc = h.photo;
     return`<div class="herb-card" data-herbid="${h.id}" style="${bdr}" onclick="openModal('${h.id}')">
       <div class="herb-card-img">
@@ -1616,7 +1603,7 @@ function openModal(id){
   document.getElementById('modal-title').textContent=h.name;
   document.getElementById('modal-latin').textContent=h.lat;
   const hero=document.getElementById('modal-hero');
-  const heroSrc=h.photo||h.photo2;
+  const heroSrc=h.photo||(h.photo2&&!h.photo2.includes('600px')?h.photo2:'');
   const heroFb=h.photo;
   hero.innerHTML=h.photo
     ?`<img src="${heroSrc}" alt="${h.name}" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover" onerror="if(this.src!==heroFb){this.src='${heroFb}'}else{this.parentElement.innerHTML='<div class=\\'modal-hero-fallback\\'>${h.emoji}</div>'}">`
@@ -1912,352 +1899,7 @@ window.addEventListener('load', () => setTimeout(loadWikiPhotos, 150));
 // ═══════════════════════════════════════
 // RECIPE DATABASE
 // ═══════════════════════════════════════
-const RECEPTEN_DB = {
-
-  // ── DRANKEN ──────────────────────────────────────────────────────────────
-  'Mojito': {
-    cat:'drank', herbId:'munt',
-    tijd:'10 min', porties:'1 glas', moeilijk:'⚡ Makkelijk',
-    intro:'De klassieke Cubaanse cocktail — fris, kruiding en verfrissend.',
-    ingredienten:['8 verse muntblaadjes','2 cl verse limoensap','1 tl rietsuiker of suikersiroop','5 cl witte rum','bruiswater of tonic','ijs','1 schijfje limoen en munttak voor garnering'],
-    methode:['Doe muntblaadjes en suiker in een glas en stamp licht (niet te hard — je wil geen bittere smaak).','Voeg het limoensap toe en meng even.','Vul het glas met crushed ice of ijsblokjes.','Giet de rum erover.','Vul aan met bruiswater en roer voorzichtig.','Garneer met een munttak en schijfje limoen.'],
-    tip:'Wil je zonder alcohol? Vervang de rum door extra bruiswater en een scheutje appelazijn voor de frisheid.',
-  },
-
-  'Mojito (alcoholvrij)': {
-    cat:'drank', herbId:'munt',
-    tijd:'5 min', porties:'1 glas', moeilijk:'⚡ Makkelijk',
-    intro:'Fris en verfrissend zonder alcohol.',
-    ingredienten:['8 verse muntblaadjes','sap van 1 limoen','1 tl honing of agavesiroop','bruiswater','ijs','limoen en munt voor garnering'],
-    methode:['Stamp munt met honing in een glas.','Voeg limoensap toe.','Vul met ijs en bruiswater. Roer en garneer.'],
-    tip:'Ook lekker met een scheutje komkommersap.',
-  },
-
-  'Lavendelthee': {
-    cat:'thee', herbId:'lavendel',
-    tijd:'8 min', porties:'1 kop', moeilijk:'⚡ Makkelijk',
-    intro:'Kalmerend en ontspannend — ideaal voor het slapengaan.',
-    ingredienten:['1–2 tl gedroogde lavendelbloemen (of 3 tl vers)','250 ml water (90°C — niet kokend)','optioneel: honing of een schijfje citroen'],
-    methode:['Breng water aan de kook en laat 1 minuut afkoelen.','Doe de lavendelbloemen in een theezakje of infuser.','Laat 5–7 minuten trekken (niet langer — wordt bitter).','Verwijder de bloemen en zoet naar smaak met honing.'],
-    tip:'Combineer met kamille voor een extra krachtig slaapthee-effect.',
-  },
-
-  'Kamilleinfusie': {
-    cat:'thee', herbId:'kamille',
-    tijd:'8 min', porties:'1 kop', moeilijk:'⚡ Makkelijk',
-    intro:'Het klassieke kalmerende thee voor elke avond.',
-    ingredienten:['2–3 tl verse of 1 tl gedroogde kamillebloemen','250 ml heet water (90°C)','honing naar smaak'],
-    methode:['Breng water bijna aan de kook.','Doe kamille in infuser of los in het water.','Laat 5 minuten trekken.','Zeven en serveren met een tl honing.'],
-    tip:'Verse bloemen geven een verfijnder aroma dan gedroogde.',
-  },
-
-  'Pesto': {
-    cat:'koken', herbId:'basilicum',
-    tijd:'10 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'De Italiaanse klassieker — vers, aromatisch en in 10 minuten klaar.',
-    ingredienten:['60 g verse basilicumblaadjes','40 g pijnboompitten (of walnoten)','40 g Parmezaan, geraspt','2 teentjes knoflook','120 ml goede olijfolie extra vierge','zout en peper'],
-    methode:['Rooster de pijnboompitten kort droog in een pan tot licht goudbruin. Laat afkoelen.','Doe basilicum, knoflook en pijnboompitten in een blender of vijzel.','Voeg de Parmezaan toe en mix grof.','Voeg de olijfolie in een dunne straal toe terwijl je mixt.','Breng op smaak met zout en peper.'],
-    tip:'Bewaar in een glazen pot met een dun laagje olijfolie bovenop — houdt 1 week in de koelkast of 3 maanden in de vriezer.',
-  },
-
-  'Caprese salade': {
-    cat:'koken', herbId:'basilicum',
-    tijd:'10 min', porties:'2 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Simpel, kleurrijk en overheerlijk — de zomer op een bord.',
-    ingredienten:['3 rijpe tomaten','250 g verse mozzarella','1 bosje verse basilicum','3 el olijfolie extra vierge','zout, peper, optioneel balsamicocrème'],
-    methode:['Snijd tomaten en mozzarella in gelijke plakjes.','Leg afwisselend tomaat en mozzarella op een schaal.','Voeg basilicumblaadjes toe tussen de plakjes.','Besprenkel met olijfolie, zout en peper.','Optioneel: een lijntje balsamicocrème erover.'],
-    tip:'Gebruik tomaten op kamertemperatuur — koude tomaten verliezen veel smaak.',
-  },
-
-  'Gegrild vlees met rozemarijn': {
-    cat:'koken', herbId:'rozemarijn',
-    tijd:'25 min + 2u marineren', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Rozemarijn en gegrild vlees zijn een klassieke combinatie — aromatisch en vol van smaak.',
-    ingredienten:['800 g lam, kip of varken','4 takjes verse rozemarijn','4 teentjes knoflook, fijngesneden','4 el olijfolie','sap van 1 citroen','zout en grof zwart peper'],
-    methode:['Meng olijfolie, citroen, knoflook en de naaldjes van 2 takjes rozemarijn tot een marinade.','Wrijf het vlees in met de marinade en laat minstens 2 uur (liefst een nacht) marineren.','Gril het vlees op hoge hitte met de resterende rozemarijntakjes als aromatische borstel.','Laat 5 minuten rusten voor je aansnijdt.'],
-    tip:'Steek rozemarijntakjes als spies door het vlees voor extra aroma tijdens het grillen.',
-  },
-
-  'Rozemarijn focaccia': {
-    cat:'koken', herbId:'rozemarijn',
-    tijd:'2u30 (inclusief rijzen)', porties:'6 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Luchtig Italiaans platbrood met rozemarijn en zeezout.',
-    ingredienten:['500 g bloem type 00','7 g droge gist','1 tl zout + extra zeezout','350 ml lauw water','8 el olijfolie','4–5 takjes verse rozemarijn'],
-    methode:['Meng bloem, gist en zout. Voeg water en 4 el olie toe en kneed 8 min tot soepel deeg.','Laat 1 uur rijzen op warme plek (afgedekt).','Vet een bakplaat in met 2 el olie. Druk deeg uit op de plaat. Laat 30 min narijzen.','Maak kuiltjes met je vingers, druk rozemarijn in en besprenkel met rest olie en zeezout.','Bak 20–25 min op 220°C tot goudbruin.'],
-    tip:'Voeg olijven of zongedroogde tomaten toe voor variatie.',
-  },
-
-  'Tabouleh': {
-    cat:'koken', herbId:'munt',
-    tijd:'20 min + 30 min wachten', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Fris Libanees salade met veel verse kruiden.',
-    ingredienten:['100 g bulgur of couscous','3 bosjes verse peterselie, fijngesneden','1 bosje verse munt, fijngesneden','4 tomaten, in blokjes','1 komkommer, in blokjes','3 el olijfolie','sap van 2 citroenen','zout en peper'],
-    methode:['Giet kokend water over bulgur (1:1.5), dek af en laat 10 min wellen. Laat afkoelen.','Hak peterselie en munt fijn.','Meng alle ingrediënten door elkaar.','Breng op smaak met citroen, olie, zout en peper.','Laat 30 min rusten voor het serveren.'],
-    tip:'De peterselie is het hoofdingrediënt — gebruik minstens 3x zoveel als de munt.',
-  },
-
-  'Tzatziki': {
-    cat:'koken', herbId:'dille',
-    tijd:'15 min + 1u koelen', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Griekse yoghurtsaus met komkommer en dille — fris en romig.',
-    ingredienten:['500 g Griekse volle yoghurt','1 komkommer','2 el verse dille, fijngesneden','2 teentjes knoflook','2 el olijfolie','1 el witte wijnazijn of citroensap','zout'],
-    methode:['Rasp de komkommer grof. Knijp het vocht er goed uit met een doek of zeef.','Meng yoghurt, komkommer, knoflook, dille en olie.','Breng op smaak met azijn/citroen en zout.','Koel minstens 1 uur voor het serveren.'],
-    tip:'Hoe meer je het vocht uit de komkommer knijpt, hoe dikker de tzatziki wordt.',
-  },
-
-  'Vlierbloesemlimonade': {
-    cat:'drank', herbId:'vlier',
-    tijd:'30 min + 24u trekken', porties:'8–10 glazen', moeilijk:'🌱 Gemiddeld',
-    intro:'Verfijnde zomerse limonade van verse vlierbloesem — floral en verfrissend.',
-    ingredienten:['20 vlierbloesemsschermen (vers geplukt)','1 liter water','750 g suiker','2 citroenen in plakjes','2 el citroenzuur (optioneel, als conservering)'],
-    methode:['Breng water met suiker aan de kook tot de suiker oplost. Laat afkoelen.','Doe vlierbloesemsschermen en citroenschijfjes in een grote pot.','Giet het afgekoelde suikerwater erover.','Voeg citroenzuur toe indien gewenst.','Dek af en laat 24 uur trekken op kamertemperatuur.','Zeven door kaasdoek en in flessen bewaren.','Serveren verdund met bruiswater (1:4).'],
-    tip:'Houdt 2 weken gekoeld. Kan ook worden ingevroren als ijsblokjes.',
-  },
-
-  'Gouden melk': {
-    cat:'drank', herbId:'kurkuma',
-    tijd:'10 min', porties:'1 kop', moeilijk:'⚡ Makkelijk',
-    intro:'Ayurvedisch anti-ontstekingsdrankje — warm, troostend en gezond.',
-    ingredienten:['250 ml plantaardige melk (haver, amandel of kokos)','1 tl kurkumapoeder','1/4 tl gemberpoeder of 1 cm vers gember','1/4 tl kaneel','snuf zwarte peper (activeert de kurcumine)','1 tl honing of ahornsiroop'],
-    methode:['Verwarm de melk op middelhoog vuur.','Voeg kurkuma, gember, kaneel en peper toe.','Roer goed en verwarm 3–4 min (niet koken).','Giet in een mok en zoet met honing.'],
-    tip:'Zwarte peper is essentieel — het verhoogt de opname van curcumine met 2000%.',
-  },
-
-  'Gemberthee': {
-    cat:'thee', herbId:'gember',
-    tijd:'10 min', porties:'1 kop', moeilijk:'⚡ Makkelijk',
-    intro:'Verwarmend en goed voor de spijsvertering — perfect bij verkoudheid.',
-    ingredienten:['3–4 schijfjes verse gember (ca. 5 mm dik)','250 ml water','sap van 1/2 citroen','1 tl honing'],
-    methode:['Breng water met gemberschijfjes aan de kook.','Laat 7 minuten zachtjes sudderen.','Zeven in een mok.','Voeg citroensap en honing toe.'],
-    tip:'Voeg een snufje cayennepeper toe voor extra warmte en slijmoplossend effect.',
-  },
-
-  'Hibiscusthee (Karkadeh)': {
-    cat:'thee', herbId:'hibiscus',
-    tijd:'10 min', porties:'4 koppen', moeilijk:'⚡ Makkelijk',
-    intro:'Helderrode, friszure thee van hibiscuskelken — rijk aan vitamine C.',
-    ingredienten:['4 el gedroogde hibiscuskelken','1 liter water','2–3 el suiker of honing naar smaak','optioneel: 1 kaneelstokje, stukje gember'],
-    methode:['Breng water aan de kook.','Voeg hibiscuskelken toe (en eventueel kaneel/gember).','Laat 5–8 minuten trekken.','Zeven en zoeten naar smaak.','Warm of gekoeld serveren.'],
-    tip:'Als ijsthee met een schijfje sinaasappel is dit een absolute zomerhit.',
-  },
-
-  'Lavandel koekjes': {
-    cat:'dessert', herbId:'lavendel',
-    tijd:'35 min', porties:'24 koekjes', moeilijk:'🌱 Gemiddeld',
-    intro:'Delicate, bloemige koekjes met een subtiel lavendelaroma.',
-    ingredienten:['200 g boter (kamertemperatuur)','100 g poedersuiker','260 g bloem','1 el gedroogde lavendelbloemen (fijn gemalen)','snuf zout','1 tl vanille-extract'],
-    methode:['Mix boter en suiker tot luchtig.','Voeg vanille en lavendel toe.','Meng bloem en zout erdoor tot een soepel deeg.','Rol tot een cylinder (5 cm diameter), wikkel in folie en koel 30 min.','Snijd in plakjes van 5 mm en leg op bakpapier.','Bak 12–14 min op 170°C tot lichtgoud.'],
-    tip:'Gebruik Lavendula angustifolia — niet alle soorten zijn geschikt voor consumptie.',
-  },
-
-  'Paardenbloem wijn': {
-    cat:'drank', herbId:'paardenbloem',
-    tijd:'30 min + 2–3 weken vergisten', porties:'4 flessen', moeilijk:'🌳 Uitdagend',
-    intro:'Gouden wijn van verse paardenbloemenbloemen — een echt ambachtelijk project.',
-    ingredienten:['1.5 liter paardenbloemenbloemen (enkel de gele blaadjes, groen verwijderd)','1.5 kg suiker','4.5 liter water','sap en schil van 3 citroenen + 2 sinaasappelen','1 tl wijngist of broodgist','1 tl gistvoeding'],
-    methode:['Verwijder alle groene delen van de bloemen (ze maken het bitter).','Giet kokend water over de bloemen. Laat 24 uur trekken.','Zeven, voeg suiker, citrus en sap toe. Verwarm kort tot suiker oplost.','Laat afkoelen tot 25°C. Voeg gist toe.','Overhevelen naar een gistingsvat met waterslot.','Laat 2–3 weken vergisten.','Bottelen en nog 4–6 weken laten rijpen.'],
-    tip:'Pluk bloemen op een zonnige ochtend wanneer ze volledig open zijn voor de beste smaak.',
-  },
-
-  'Béarnaisesaus': {
-    cat:'koken', herbId:'dragon',
-    tijd:'20 min', porties:'4 porties', moeilijk:'🌳 Uitdagend',
-    intro:'De klassieke Franse botersaus met dragon — onmisbaar bij steak.',
-    ingredienten:['3 eierdooiers','200 g ongezouten boter (geklaard)','3 el dragonazijn','2 el witte wijn','1 sjalotje, fijngesneden','2 el verse dragon, fijngesneden','zout en witte peper'],
-    methode:['Kook sjalot, azijn en wijn in tot 2 eetlepels vloeistof. Laat afkoelen.','Klop eierdooiers met de reductie au bain-marie tot dik en schuimig (niet te heet!).','Voeg geklaard boter druppelsgewijs toe terwijl je klopt.','Voeg verse dragon toe en breng op smaak.'],
-    tip:'Als de saus schift: voeg 1 el ijskoud water toe en klop snel. Au bain-marie nooit boven 65°C.',
-  },
-
-  'Curry met kurkuma': {
-    cat:'koken', herbId:'kurkuma',
-    tijd:'35 min', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Aromatische gele curry met verse kurkuma — voedzaam en vol van smaak.',
-    ingredienten:['500 g kip, tofu of kikkererwten','2 tl kurkumapoeder','1 tl komijnpoeder','1 tl korianderpoeder','1 uitje, gesneden','3 teentjes knoflook','1 blik kokosmelk','400 g tomatenblokjes','2 el kokosolie','verse koriander voor garnering'],
-    methode:['Fruit uitje en knoflook in kokosolie.','Voeg de specerijen toe en bak 1 min mee.','Voeg het vlees/tofu toe en bak aan.','Voeg tomaten en kokosmelk toe. Sudder 20 min.','Serveer met rijst en verse koriander.'],
-    tip:'Verse kurkuma (geraspt) geeft een intensere smaak dan poeder. Gebruik 3x zoveel als poeder.',
-  },
-
-  'Hummus': {
-    cat:'koken', herbId:'komijn',
-    tijd:'15 min', porties:'6 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Romige kikkererwtenspread met komijn en tahini — een Midden-Oosters basisrecept.',
-    ingredienten:['400 g gekookte kikkererwten (blik mag)','3 el tahini','sap van 1 citroen','2 teentjes knoflook','1 tl komijnpoeder','4 el olijfolie + extra voor garnering','zout','paprikapoeder voor garnering'],
-    methode:['Blend kikkererwten met tahini, citroensap, knoflook en komijn tot glad.','Voeg olijfolie toe terwijl je blent.','Voeg 2–4 el ijswater toe voor een lichtere textuur.','Breng op smaak met zout.','Serveer met olijfolie, paprikapoeder en eventueel hele kikkererwten.'],
-    tip:'Verwijder de velletjes van de kikkererwten voor extra gladde hummus.',
-  },
-
-  'Vichyssoise': {
-    cat:'koken', herbId:'bieslook',
-    tijd:'40 min', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Elegante koude aardappel-preisoep met bieslook — klassieke Franse bistrokeuken.',
-    ingredienten:['500 g aardappelen, geschild en in blokjes','3 preistengels (alleen het wit)','1 ui','1 liter kippenbouillon','200 ml room','30 g boter','zout, peper, nootmuskaat','3 el verse bieslook, fijngehakt'],
-    methode:['Smelt boter en fruit ui en prei zacht (10 min).','Voeg aardappelen en bouillon toe. Kook 20 min.','Mix glad met een staafmixer. Voeg room toe.','Breng op smaak. Laat afkoelen en dan koelen.','Serveer koud met fijngehakte bieslook bovenop.'],
-    tip:'Kan ook warm geserveerd worden als klassieke aardappelsoep.',
-  },
-
-  'Brandnetelsoep': {
-    cat:'soep', herbId:'brandnetel',
-    tijd:'25 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Verrassend smakelijke voorjaarssoep — rijk aan ijzer en vitamine C.',
-    ingredienten:['200 g jonge brandnetelblaadjes (handschoenen!)','1 ui, gesneden','2 aardappelen, in blokjes','1 liter groentebouillon','100 ml room of kokosmelk','30 g boter','zout, peper, nootmuskaat'],
-    methode:['Blancheer brandnetels 2 min in kokend water. Giet af.','Fruit ui in boter. Voeg aardappelen en bouillon toe. Kook 15 min.','Voeg de geblancheerde brandnetels toe.','Mix glad, voeg room toe en breng op smaak.'],
-    tip:'Pluk enkel de jonge toppen van de plant in het voorjaar (maart-mei) — daarna worden ze te vezelig.',
-  },
-
-  'Salsa': {
-    cat:'koken', herbId:'koriander',
-    tijd:'15 min', porties:'6 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Verse Mexicaanse salsa — snel gemaakt en vol van smaak.',
-    ingredienten:['4 rijpe tomaten, fijngesneden','1 rode ui, fijngesneden','2 jalapeños of 1 rode peper','groot bosje verse koriander','sap van 2 limoenen','zout'],
-    methode:['Snijd alle ingrediënten fijn.','Meng alles in een kom.','Breng op smaak met limoensap en zout.','Laat 15 min staan voor de smaken samensmelten.'],
-    tip:'Voor een minder scherpe smaak: verwijder de zaadjes van de peper.',
-  },
-
-  'Kip provençal met tijm': {
-    cat:'koken', herbId:'tijm',
-    tijd:'55 min', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Zuidelijke eenpansmaaltijd met tijm, knoflook en tomaten.',
-    ingredienten:['8 kippenbouten','6 takjes verse tijm','4 teentjes knoflook','400 g tomatenblokjes','1 glas witte wijn','100 g olijven','2 el olijfolie','zout, peper, paprikapoeder'],
-    methode:['Kruid kip met zout, peper en paprikapoeder. Bak bruin in olijfolie.','Voeg knoflook en tijm toe. Bak 1 min.','Voeg wijn toe en laat inkoken.','Voeg tomaten en olijven toe. Dek af.','Sudder 35 min op laag vuur.'],
-    tip:'Gebruik gedroogde tijm als verse niet beschikbaar is — gebruik dan 1/3 van de hoeveelheid.',
-  },
-
-  'Calendulazalf': {
-    cat:'koken', herbId:'calendula',
-    tijd:'60 min + 6 weken olie-infusie', porties:'2 potjes', moeilijk:'🌱 Gemiddeld',
-    intro:'Kalmerende zalf voor droge huid, eczeem en kleine wondjes.',
-    ingredienten:['200 ml calendula-infusie-olie','50 g bijenwas (of candelillawas voor vegan)','10 druppels lavendelolie','5 druppels teeboomolie (optioneel)'],
-    methode:['Smelt bijenwas au bain-marie in de calendula-olie.','Test de stevigheid door 1 tl op een koud bordje te laten stollen.','Voeg etherische oliën toe van het vuur.','Giet snel in glazen potjes. Laat opstijven zonder bewegen.'],
-    tip:'Bewaar koel en donker. Houdbaar 1 jaar. Etiketeer met datum.',
-  },
-
-  'Rozenbottelthee': {
-    cat:'thee', herbId:'wilde-roos',
-    tijd:'10 min', porties:'2 koppen', moeilijk:'⚡ Makkelijk',
-    intro:'Vitamine C-rijke thee van gedroogde rozenbottels — friszuur en aromatisch.',
-    ingredienten:['2 el gedroogde rozenbottels (gezaaid en gepeld)','500 ml water','honing naar smaak','optioneel: kaneelstokje'],
-    methode:['Breng water met rozenbottels aan de kook.','Zet het vuur laag en laat 10 min zachtjes sudderen.','Zeven door fijne zeef of kaasdoek.','Zoeten met honing en serveren.'],
-    tip:'Rozenbottels bevatten 20x meer vitamine C dan sinaasappels. Niet koken om verlies te beperken.',
-  },
-
-  'Salie-botersaus': {
-    cat:'koken', herbId:'salie',
-    tijd:'10 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Italiaanse klassieke saus voor pasta, gnocchi of risotto.',
-    ingredienten:['100 g ongezouten boter','12–15 verse salieblaadjes','1 teentje knoflook (optioneel)','zout, peper','Parmezaan om te serveren'],
-    methode:['Smelt boter op middelhoog vuur tot het schuimt.','Voeg salieblaadjes toe — ze zullen sissen.','Bak 2–3 min tot de boter licht nootbruin wordt (beurre noisette) en de salie knapperig.','Niet laten aanbranden. Gieten over gekookte pasta of gnocchi.'],
-    tip:'De nootbruine boter (beurre noisette) is het geheim — die geeft een rijke, karamelachtige smaak.',
-  },
-
-  'Guacamole': {
-    cat:'koken', herbId:'koriander',
-    tijd:'10 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Verse Mexicaanse avocadodip met koriander.',
-    ingredienten:['3 rijpe avocados','sap van 1–2 limoenen','1/2 rode ui, fijngesneden','1 rode peper (optioneel)','groot bosje verse koriander','zout'],
-    methode:['Halveer avocados en verwijder pit. Schep vlees uit.','Plet grof met een vork (niet te glad — structuur is beter).','Voeg limoensap, ui, peper en koriander toe.','Breng op smaak met zout.'],
-    tip:'Bewaar met de avocadopit erin en plastic folie direct op het oppervlak om bruinkleuring te voorkomen.',
-  },
-
-  'Muntthee': {
-    cat:'thee', herbId:'munt',
-    tijd:'7 min', porties:'1 kop', moeilijk:'⚡ Makkelijk',
-    intro:'De frisse, spijsverteringsbevorderende basisthee.',
-    ingredienten:['6–8 verse muntblaadjes (of 1 tl gedroogd)','250 ml heet water (90°C)','optioneel: honing of suiker'],
-    methode:['Munt in een mok of theepot doen.','Heet (niet kokend) water erover gieten.','5 minuten laten trekken.','Zeven of direct serveren met honing.'],
-    tip:'Marokkaanse traditie: zet de munt met groene thee en veel suiker voor de authentieke smaak.',
-  },
-
-  'Citroenverbena thee': {
-    cat:'thee', herbId:'citroenverbena',
-    tijd:'7 min', porties:'1 kop', moeilijk:'⚡ Makkelijk',
-    intro:'De meest citroensterk smakende thee die je zelf kunt kweken.',
-    ingredienten:['4–5 verse citroenverbena blaadjes','250 ml heet water (90°C)','honing of suiker naar smaak'],
-    methode:['Doe de blaadjes in een mok.','Overgiet met bijna kokend water.','Laat 5 min trekken.','Verwijder blaadjes en zoet naar smaak.'],
-    tip:'Combineer met munt en een schijfje citroen voor een super verfrissende ijsthee.',
-  },
-
-  // ── SOEPEN ──────────────────────────────────────────────────────────────
-  'Tomaten-paprikasoep met basilicum': {
-    cat:'soep', herbId:'basilicum',
-    tijd:'35 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Warme Mediterrane soep vol van smaak — basilicum voeg je toe op het einde voor het verse aroma.',
-    ingredienten:['6 rijpe tomaten of 2 blikken gepelde tomaten','2 rode paprikas','1 ui','3 teentjes knoflook','1 el tomatenpuree','500 ml groentebouillon','2 el olijfolie','groot bosje verse basilicum','zout, peper, snuf suiker'],
-    methode:['Rooster paprikas in oven op 220°C tot zwart (20 min). Pel en ontpit.','Fruit ui en knoflook. Voeg tomatenpuree toe, bak 1 min.','Voeg tomaten, paprika en bouillon toe. Kook 15 min.','Mix glad. Breng op smaak.','Serveer met verse basilicum en olijfolie.'],
-    tip:'Geblakerde paprika geeft een diepe, rokerige smaak — niet overslaan!',
-  },
-  'Uiensoep met tijm': {
-    cat:'soep', herbId:'tijm',
-    tijd:'55 min', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Klassieke Franse uiensoep met gekaramelliseerde uien en knapperige kaaskorst.',
-    ingredienten:['6 grote uien in ringen','4 takjes verse tijm','1 liter runderbouillon','200 ml witte wijn','50 g boter','4 sneden stokbrood','100 g Gruyère geraspt'],
-    methode:['Karamelliseer uien met tijm in boter op laag vuur — 30 min geduldig roeren.','Voeg wijn toe, 5 min inkoken. Voeg bouillon toe, 15 min sudderen.','Schep in ovenvaste kommen. Leg stokbrood op soep, bestrooi met kaas.','Gratineer 5 min onder de grill tot goudbruin.'],
-    tip:'Geduld bij het karamelliseren is het geheim — vlug gaan geeft bittere uien.',
-  },
-  'Pompoensoep met salie': {
-    cat:'soep', herbId:'salie',
-    tijd:'40 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Fluweelzachte herfstsoep met knapperige gefrituurde salie als garnering.',
-    ingredienten:['1 kg pompoen in blokjes','1 ui','2 teentjes knoflook','800 ml bouillon','200 ml kokosmelk','8 verse salieblaadjes','boter','nootmuskaat, zout, peper'],
-    methode:['Fruit ui en knoflook. Voeg pompoen en bouillon toe. Kook 20 min.','Mix glad. Roer kokosmelk erdoor. Op smaak brengen.','Frit salieblaadjes knapperig in boter (1 min).','Serveer soep met knapperige salie.'],
-    tip:'Hokkaido pompoen hoeft niet geschild — de schil wordt zacht.',
-  },
-  'Thaise kokossoep (Tom Kha)': {
-    cat:'soep', herbId:'koriander',
-    tijd:'25 min', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Romige aromatische Thaise soep met kokosmelk en verse koriander.',
-    ingredienten:['400 ml kokosmelk','600 ml kippenbouillon','200 g kip of tofu','2 stengels citroengras','5 plakjes gember','4 kaffirlimoenbladen','200 g champignons','sap van 1 limoen','2 el vissaus of sojasaus','verse koriander'],
-    methode:['Breng bouillon met citroengras, gember en limoenbladeren aan de kook.','Voeg kokosmelk toe. Voeg kip/tofu en champignons toe. Kook 8–10 min.','Breng op smaak met vissaus en limoensap.','Serveer met verse koriander. Verwijder de aromatische stengels.'],
-    tip:'Niet koken na het toevoegen van kokosmelk — dat scheidt de olie af.',
-  },
-  'Koude komkommersoep met dille': {
-    cat:'soep', herbId:'dille',
-    tijd:'15 min + 1u koelen', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Frisse zomersoep die je niet hoeft te koken — klaar in 15 minuten.',
-    ingredienten:['2 grote komkommers','300 g Griekse yoghurt','200 ml koude bouillon','2 el verse dille','1 teentje knoflook','sap van halve citroen','zout, witte peper','olijfolie'],
-    methode:['Schil en ontpit komkommers. Blend met yoghurt, bouillon, dille en knoflook glad.','Op smaak met citroen, zout en peper. Koel 1 uur.','Serveer met verse dille en olijfolie.'],
-    tip:'Voeg bruiswater toe vlak voor het serveren voor een lichtere textuur.',
-  },
-  'Gele linzensoep met kurkuma': {
-    cat:'soep', herbId:'kurkuma',
-    tijd:'30 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Voedende, aromatische linzensoep — kleur en smaak van kurkuma, gember en komijn.',
-    ingredienten:['250 g rode linzen','1 ui','3 teentjes knoflook','1 tl kurkuma','1 tl komijn','1 tl koriander','stukje gember (2 cm)','1 blik tomatenblokjes','1 liter bouillon','2 el olijfolie','citroen, verse koriander'],
-    methode:['Fruit ui, knoflook, gember en specerijen.','Voeg linzen, tomaten en bouillon toe. Kook 20 min.','Gedeeltelijk mixen voor romige textuur.','Op smaak met citroen. Serveer met koriander.'],
-    tip:'Rode linzen hoeven niet geweekt — ideale snel-soep voor door de week.',
-  },
-  'Wortelpompoensoep met gember': {
-    cat:'soep', herbId:'gember',
-    tijd:'35 min', porties:'4 porties', moeilijk:'⚡ Makkelijk',
-    intro:'Verwarmende lichtzoete soep met pittige gember — herfst in een kom.',
-    ingredienten:['500 g wortelen','400 g pompoen','1 ui','4 cm verse gember','2 teentjes knoflook','1 liter groentebouillon','200 ml kokosmelk','2 el kokosolie','sap van 1 sinaasappel'],
-    methode:['Fruit ui, knoflook en gember in kokosolie.','Voeg wortels, pompoen en sinaasappelsap toe. Roerbak 3 min.','Voeg bouillon toe. Kook 20 min. Mix glad.','Roer kokosmelk erdoor. Op smaak brengen.'],
-    tip:'Verse gember geeft een helderdere smaak dan poeder.',
-  },
-  'Klassieke dagsoep met laurierblad': {
-    cat:'soep', herbId:'laurier',
-    tijd:'45 min', porties:'6 porties', moeilijk:'⚡ Makkelijk',
-    intro:'De Belgische/Nederlandse basissoep — met laurier als smaakfundament.',
-    ingredienten:['3 laurierblaadjes','2 wortelen','2 stengels selderij','1 prei','1 ui','2 aardappelen','1.5 liter bouillon','boter','peterselie','zout, peper, nootmuskaat'],
-    methode:['Snijd groenten in blokjes. Fruit ui. Voeg alle groenten toe.','Voeg bouillon en laurierblaadjes toe. Kook 25 min.','Verwijder laurierblaadjes. Op smaak brengen.','Garneer met verse peterselie.'],
-    tip:'Verwijder laurierblaadjes altijd na het koken — ze worden bitterder bij lang koken.',
-  },
-  'Franse roomsoep met dragon': {
-    cat:'soep', herbId:'dragon',
-    tijd:'35 min', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Verfijnde romige soep uit de Franse keuken met subtiel anijsachtig dragonaroma.',
-    ingredienten:['2 sjalotten','3 teentjes knoflook','200 ml witte wijn','600 ml kippenbouillon','200 ml room','30 g boter','2 el verse dragon','1 el bloem','zout, witte peper'],
-    methode:['Fruit sjalotten en knoflook in boter. Voeg bloem toe, 1 min bakken.','Blus met witte wijn. 3 min inkoken.','Voeg bouillon toe, 15 min sudderen.','Roer room en dragon erdoor. 3 min verwarmen.','Op smaak brengen. Serveer met croutons.'],
-    tip:'Dragon niet laten koken — het verliest snel zijn fijne smaak.',
-  },
-  'Vichyssoise (koude aardappelsoep)': {
-    cat:'soep', herbId:'bieslook',
-    tijd:'40 min + 2u koelen', porties:'4 porties', moeilijk:'🌱 Gemiddeld',
-    intro:'Elegante koude soep uit de Franse bistro — bijna te mooi om te eten.',
-    ingredienten:['500 g aardappelen','3 preistengels (wit deel)','1 ui','1 liter kippenbouillon','200 ml room','30 g boter','zout, peper, nootmuskaat','3 el verse bieslook fijngehakt'],
-    methode:['Fruit ui en prei zacht (10 min). Voeg aardappelen en bouillon toe. Kook 20 min.','Mix glad. Voeg room toe. Op smaak brengen.','Laat afkoelen, koel minstens 2u.','Serveer koud met verse bieslook.'],
-    tip:'Wordt dikker in de koelkast — verdun eventueel met koude bouillon.',
-  },
-};
+const RECEPTEN_DB = {}; // Wordt gevuld vanuit Firebase
 
 // ═══════════════════════════════════════
 // GEOLOCATION
@@ -3027,7 +2669,7 @@ function savePosts(posts) { localStorage.setItem('hr_posts', JSON.stringify(post
 function seedPosts() {
   if (getPosts().length > 0) return;
   const seed = [
-    { id:'p1', author:'HerbalRoot Team', avatar:'', cat:'tip', title:'Welkom bij de HerbalRoot Community! 🌿',
+    { id:'p1', author:'Kweekwijs Team', avatar:'', cat:'tip', title:'Welkom bij de Kweekwijs Community! 🌱',
       body:'Dit is jouw plek om vragen te stellen, tips te delen en ervaringen uit te wisselen over het kweken van kruiden. Stel gerust vragen — wij helpen elkaar!',
       date: new Date().toLocaleDateString('nl-BE'), likes:3, replies:[] },
     { id:'p2', author:'Sofie V.', avatar:'', cat:'vraag', title:'Mijn basilicum laat de blaadjes hangen — wat doe ik fout?',
