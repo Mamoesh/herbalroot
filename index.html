@@ -480,25 +480,11 @@ select option{background:var(--surface2);}
       <div class="step-dot active" id="dot-0"></div><div class="step-dot" id="dot-1"></div>
       <div class="step-dot" id="dot-2"></div><div class="step-dot" id="dot-3"></div>
     </div>
-    <div class="step active" id="step-0">
-      <div class="card">
-        <h2>🌍 Jouw land</h2><p class="sub">Kweekwijs is beschikbaar voor België en Nederland.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.5rem" id="tg-land">
-          <button type="button" class="geo-choice-btn" id="land-be-btn" onclick="selectLand('be',this)">
-            <div class="geo-choice-icon">🇧🇪</div>
-            <div class="geo-choice-label">België</div>
-          </button>
-          <button type="button" class="geo-choice-btn" id="land-nl-btn" onclick="selectLand('nl',this)">
-            <div class="geo-choice-icon">🇳🇱</div>
-            <div class="geo-choice-label">Nederland</div>
-          </button>
-        </div>
-        <input type="hidden" id="s-land" value="">
-        <input type="hidden" id="s-klimaat" value="">
-      </div>
-      <div class="step-nav"><span></span><button class="btn" onclick="ns(0)">Volgende →</button></div>
+    <div class="step active" id="step-0" style="display:none">
+      <input type="hidden" id="s-land" value="be">
+      <input type="hidden" id="s-klimaat" value="Gematigd oceaanklimaat (Cfb)">
     </div>
-    <div class="step" id="step-1">
+    <div class="step active" id="step-1">
       <div class="card">
         <h2>🌳 Kweekomgeving</h2><p class="sub">Hoe ziet jouw groeiruimte eruit?</p>
         <label>Type ruimte</label>
@@ -527,7 +513,7 @@ select option{background:var(--surface2);}
           <div class="toggle" onclick="tm(this)">📦 Kweekbakken</div>
         </div>
       </div>
-      <div class="step-nav"><button class="btn btn-outline" onclick="ps(1)">← Terug</button><button class="btn" onclick="ns(1)">Volgende →</button></div>
+      <div class="step-nav"><button class="btn btn-outline" onclick="document.getElementById('wizard-section').style.display='none';document.getElementById('hero-section').style.display='flex'">← Terug</button><button class="btn" onclick="ns(1)">Volgende →</button></div>
     </div>
     <div class="step" id="step-2">
       <div class="card">
@@ -547,11 +533,16 @@ select option{background:var(--surface2);}
     </div>
     <div class="step" id="step-3">
       <div class="card" style="text-align:center;padding:2.5rem">
-        <div style="font-size:3rem;margin-bottom:1rem">🌿</div>
+        <div style="font-size:3rem;margin-bottom:1rem">🌱</div>
         <h2>Jouw profiel is klaar!</h2>
-        <p class="sub" style="margin-top:.5rem">We hebben de beste kruiden voor jou geselecteerd.</p>
+        <p class="sub" style="margin-top:.5rem">We hebben de beste planten voor jou geselecteerd.</p>
         <div id="profile-summary" style="text-align:left;background:var(--surface2);border-radius:10px;padding:1rem 1.25rem;margin:1.5rem 0;font-size:.9rem;line-height:2;color:var(--text2)"></div>
-        
+        <button class="btn" style="width:100%;margin-bottom:.75rem;font-size:.95rem;padding:.85rem" onclick="openMoetuinPopupFromWizard()">
+          🌿 Kies jouw planten →
+        </button>
+        <button class="btn btn-outline" style="width:100%;font-size:.85rem" onclick="finishWizard()">
+          Later doen
+        </button>
       </div>
     </div>
   </div>
@@ -650,6 +641,17 @@ select option{background:var(--surface2);}
   </div>
 
 
+
+  <div style="margin-top:1.5rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:.5rem">
+      <div class="section-title" style="margin-bottom:0">🌱 Mijn Moestuin</div>
+      <button class="btn" style="font-size:.82rem;padding:.5rem 1.1rem" onclick="openMoetuinPopup()">+ Planten toevoegen</button>
+    </div>
+    <div class="section-sub" style="margin-bottom:1rem">Jouw persoonlijke moestuin — houd bij wat je zaait, uitplant en oogst.</div>
+    <div id="profiel-moestuin-grid" class="moestuin-plant-grid">
+      <div style="color:var(--text2);font-size:.85rem;padding:1.5rem 0">Nog geen planten toegevoegd. Klik op "+ Planten toevoegen" om te beginnen.</div>
+    </div>
+  </div>
 
   <div style="margin-top:2rem">
     <div class="section-title">⚙️ Profiel bewerken</div>
@@ -1418,16 +1420,10 @@ function selectLand(code, btn) {
 
 function ns(i){
   if(i===0){
-    // Accept geo result OR manual land selection
-    if(UP.geoDetected){
-      // Geo was used — land already set in UP
-    } else {
-      const l=document.getElementById('s-land')?document.getElementById('s-land').value:'';
-      if(!l){alert('Kies je land: België of Nederland.');return;}
-      UP.land=l;UP.klimaat=KL[l]||'Gematigd oceaanklimaat (Cfb)';
-    }
+    // Landstap verwijderd — standaard België
+    UP.land = document.getElementById('s-land')?.value || 'be';
+    UP.klimaat = KL[UP.land] || 'Gematigd oceaanklimaat (Cfb)';
   }
-  if(i===1){
     const types = gms('tg-type');
     if(!types.length){alert('Kies minstens één type ruimte.');return;}
     UP.types = types;  // array of selected types
@@ -1451,6 +1447,20 @@ function ns(i){
   document.getElementById('step-'+step).classList.add('active');document.getElementById('dot-'+step).classList.add('active');
   if(step===3)buildSum();
 }
+function openMoetuinPopupFromWizard() {
+  // Sla profiel op en open moestuin popup
+  finishWizard();
+  setTimeout(() => openMoetuinPopup(), 200);
+}
+
+function finishWizard() {
+  document.getElementById('hero-section').style.display = 'none';
+  document.getElementById('wizard-section').style.display = 'none';
+  UP.done = true;
+  localStorage.setItem('hr_up_' + (currentUser?.email||'guest'), JSON.stringify(UP));
+  go('profiel');
+}
+
 function ps(i){
   document.getElementById('step-'+i).classList.remove('active');document.getElementById('dot-'+i).classList.remove('active');
   const p=i-1;
