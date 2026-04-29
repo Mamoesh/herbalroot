@@ -285,6 +285,8 @@ select option{background:var(--surface2);}
 .upload-btn-area .upload-icon{font-size:2rem;margin-bottom:.5rem;}
 
 /* ── MIJN MOESTUIN ── */
+.btn-skip{background:none;border:none;color:var(--text2);font-size:.82rem;cursor:pointer;padding:.5rem;text-decoration:underline;display:block;margin:0 auto;}
+.btn-skip:hover{color:var(--text);}
 /* Popup overlay */
 .moestuin-popup-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;}
 .moestuin-popup{background:var(--bg);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:700px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp .3s ease;}
@@ -543,9 +545,7 @@ select option{background:var(--surface2);}
         <button class="btn" style="width:100%;margin-bottom:.75rem;font-size:.95rem;padding:.85rem" onclick="openMoetuinPopupFromWizard()">
           🌱 Kies jouw planten →
         </button>
-        <button class="btn btn-outline" style="width:100%;font-size:.85rem" onclick="finishWizard('kruiden')">
-          Overslaan, ga naar kruiden
-        </button>
+        <button class="btn-skip" onclick="finishWizard('kruiden')">Overslaan</button>
       </div>
     </div>
   </div>
@@ -727,9 +727,9 @@ select option{background:var(--surface2);}
       <button onclick="closeMoetuinPopup()" style="background:none;border:1px solid var(--border);color:var(--text2);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:.9rem">✕</button>
     </div>
     <div class="moestuin-popup-tabs">
-      <button class="moestuin-popup-tab active" onclick="switchPickerTab('kruiden',this)">🌱 Kruiden</button>
-      <button class="moestuin-popup-tab" onclick="switchPickerTab('groenten',this)">🥦 Groenten</button>
+      <button class="moestuin-popup-tab active" onclick="switchPickerTab('groenten',this)">🥦 Groenten</button>
       <button class="moestuin-popup-tab" onclick="switchPickerTab('fruit',this)">🍎 Fruit</button>
+      <button class="moestuin-popup-tab" onclick="switchPickerTab('kruiden',this)">🌱 Kruiden</button>
     </div>
     <div class="moestuin-popup-body">
       <div class="picker-grid" id="picker-grid"></div>
@@ -3739,9 +3739,9 @@ async function loadMoetuinFromFirebase() {
 function openMoetuinPopup() {
   if (!currentUser) { showToast('Log eerst in om je moestuin te beheren.','info'); return; }
   document.getElementById('moestuin-popup-overlay').style.display = 'flex';
-  pickerCurrentCat = 'kruiden';
+  pickerCurrentCat = 'groenten';
   document.querySelectorAll('.moestuin-popup-tab').forEach((t,i) => t.classList.toggle('active', i===0));
-  renderPickerGrid('kruiden');
+  renderPickerGrid('groenten');
 }
 
 function closeMoetuinPopup() {
