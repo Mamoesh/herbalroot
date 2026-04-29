@@ -472,7 +472,7 @@ select option{background:var(--surface2);}
 <div class="screen active" id="screen-home">
   <div id="hero-section">
     <div class="hero">
-      <h1>Kweek je eigen<br><em>kruidenparadijs</em></h1>
+      <h1>Kweek je eigen<br><em>moestuin</em></h1>
       <p>Persoonlijk kwekerijadvies op basis van jouw klimaat, ruimte en smaak — van zaad tot bloei.</p>
       <button class="btn" onclick="startSetup()">Aan de slag →</button>
       <button class="btn btn-outline" onclick="loadDemo()">Demo bekijken</button>
@@ -2382,7 +2382,7 @@ function setRegisterLoading(loading) {
   if (btn) btn.disabled = loading;
 }
 
-function togglePw(fieldId, btn) {
+window.togglePw = function(fieldId, btn) {
   const field = document.getElementById(fieldId);
   if (!field) return;
   const show = field.type === 'password';
@@ -2392,7 +2392,7 @@ function togglePw(fieldId, btn) {
     : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 }
 
-async function doLogin() {
+window.doLogin = async function() {
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const pw    = document.getElementById('login-pw').value;
   const err   = document.getElementById('login-error');
@@ -2437,7 +2437,7 @@ async function doLogin() {
   setLoginLoading(false);
 }
 
-async function doRegister() {
+window.doRegister = async function() {
   const name   = document.getElementById('reg-name').value.trim();
   const email  = document.getElementById('reg-email').value.trim().toLowerCase();
   const pw     = document.getElementById('reg-pw').value;
@@ -2486,7 +2486,7 @@ async function doRegister() {
   setRegisterLoading(false);
 }
 
-async function doGoogleLogin() {
+window.doGoogleLogin = async function() {
   const btn = document.getElementById('google-login-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Even wachten…'; }
   try {
@@ -2543,7 +2543,7 @@ async function doGoogleLogin() {
   }
 }
 
-async function doLogout() {
+window.doLogout = async function() {
   if (!confirm('Wil je uitloggen?')) return;
   try {
     const auth = await getFirebaseAuth();
@@ -3448,7 +3448,7 @@ const TRANSLATIONS = {
   nl: {
     nav_home:'Start', nav_kruiden:'Kruiden', nav_groenten:'Groenten',
     nav_fruit:'Fruit', nav_recepten:'Recepten', nav_community:'Community',
-    hero_title:'Kweek je eigen<br><em>kruidenparadijs</em>',
+    hero_title:'Kweek je eigen<br><em>moestuin</em>',
     hero_sub:'Persoonlijk kwekerijadvies op basis van jouw klimaat, ruimte en smaak — van zaad tot bloei.',
     hero_start:'Aan de slag →', hero_demo:'Demo bekijken',
     kruiden_title:'Kruidengids', kruiden_sub:'Klik op een kruid voor volledige info — kweek, zaaitijden, oogst, bewaring en meer.',
@@ -3921,15 +3921,8 @@ function renderProfielMoestuin() {
           '<div class="moestuin-date-field"><label>🌱 Gezaaid</label><input type="date" value="' + (entry.zaaidatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'zaaidatum\',this.value)"></div>' +
           '<div class="moestuin-date-field"><label>🪴 Uitgeplant</label><input type="date" value="' + (entry.uitplantdatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'uitplantdatum\',this.value)"></div>' +
         '</div>' +
-        '<div class="moestuin-date-row">' +
-          '<div class="moestuin-date-field"><label>🌾 Geoogst</label><input type="date" value="' + (entry.oogstdatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'oogstdatum\',this.value)"></div>' +
-          '<div class="moestuin-date-field"><label>💧 Gegoten</label><input type="date" value="' + (entry.waterdatum||'') + '" onchange="updateMoetuinField(\'' + eid + '\',\'waterdatum\',this.value)"></div>' +
-        '</div>' +
-        '<textarea class="moestuin-notes" placeholder="Notities…" onchange="updateMoetuinField(\'' + eid + '\',\'notities\',this.value)">' + (entry.notities||'') + '</textarea>' +
-        '<div class="moestuin-date-field" style="margin-top:.4rem"><label>📸 Eigen foto URL</label>' +
-        '<input type="text" value="' + (entry.foto||'') + '" placeholder="https://..." style="width:100%;padding:.35rem .5rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.75rem;outline:none" onchange="updateMoetuinField(\'' + eid + '\',\'foto\',this.value)"></div>' +
-      '</div>' +
-    '</div>';
+                '<textarea class="moestuin-notes" placeholder="Notities…" onchange="updateMoetuinField(\'' + eid + '\',\'notities\',this.value)">' + (entry.notities||'') + '</textarea>' +
+            '</div>';
   }).join('');
 }
 
