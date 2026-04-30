@@ -151,6 +151,7 @@ window.switchSection = s => {
   const map = {
     dashboard:       renderDashboard,
     'moestuin-intro': renderMoetuinIntroAdmin,
+    'recepten-intro': renderReceptenIntroAdmin,
     kruiden:   ()=>renderSection('kruiden'),
     groenten:  ()=>renderSection('groenten'),
     fruit:     ()=>renderSection('fruit'),
@@ -304,7 +305,11 @@ window.openEditor = (id, type) => {
   set('ed-zaai_binnen',(p.zaai_binnen||[]).join(', ')); set('ed-zaai_buiten',(p.zaai_buiten||[]).join(', '));
   set('ed-uitplanten',(p.uitplanten||[]).join(', ')); set('ed-oogst',(p.oogst||[]).join(', '));
   set('ed-stek',(p.stek||[]).join(', ')); set('ed-photo-url',p.photo||'');
-  set('ed-pests',JSON.stringify(p.pests||[],null,2)); set('ed-diseases',JSON.stringify(p.diseases||[],null,2));
+  // Populate plagen UI (called after DOM is ready via setTimeout)
+  setTimeout(() => {
+    renderPestList(p.pests||[], 'pest');
+    renderPestList(p.diseases||[], 'disease');
+  }, 50);
   document.getElementById('ed-id').disabled=!!id;
   document.getElementById('photo-preview').innerHTML=p.photo
     ?`<img src="${p.photo}" style="max-height:130px;border-radius:8px;object-fit:cover">`
@@ -335,9 +340,8 @@ window.savePlant = async () => {
   const months=s=>s.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)&&n>=1&&n<=12);
   const lines=s=>s.split('\n').map(x=>x.trim()).filter(Boolean);
   const csv=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
-  let pests=[],diseases=[];
-  try{pests=JSON.parse(get('ed-pests')||'[]');}catch(e){}
-  try{diseases=JSON.parse(get('ed-diseases')||'[]');}catch(e){}
+  const pests   = collectPestEntries('pest');
+  const diseases = collectPestEntries('disease');
   const levensduurVal = get('ed-levensduur');
   const zelfzaaiendRaw = get('ed-zelfzaaiend');
   const zelfzaaiendVal = zelfzaaiendRaw === 'ja' ? true : zelfzaaiendRaw === 'nee' ? false : undefined;
@@ -1298,6 +1302,148 @@ window.saveMoetuinIntro = async () => {
   } catch(e) { toast('Fout: '+e.message,'err'); }
 };
 
+// ── Recepten Intro beheer ─────────────────────────────────────
+async function renderReceptenIntroAdmin() {
+  const cats = [
+    {key:'gerecht', label:'🍽 Gerechten & Soepen'},
+    {key:'drank',   label:'🥤 Dranken & Cocktails'},
+    {key:'thee',    label:'🍵 Thee & Infusies'},
+    {key:'dessert', label:'🍰 Desserts'},
+    {key:'verzorging', label:'✨ Verzorgingsproducten'},
+  ];
+
+  document.getElementById('main-panel').innerHTML = `
+    <div class="page-title-row">
+      <div class="page-title">🍳 Recepten — introductiepagina</div>
+      <button class="btn-primary" onclick="saveReceptenIntro()">💾 Opslaan</button>
+    </div>
+    <p class="page-sub">Pas hier de tekst en foto's aan van de recepten introductiepagina.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:.5rem">
+      <div>
+        <div class="dash-section-title">📄 Algemeen</div>
+        <div class="fg"><label>Paginatitel</label><input id="ri-title" placeholder="Recepten & Dranken"></div>
+        <div class="fg"><label>Subtitel</label><input id="ri-sub" placeholder="Ontdek onze recepten..."></div>
+        <div class="fg"><label>Hero afbeelding URL</label><input id="ri-heroImg" placeholder="https://..."></div>
+        <div class="fg"><label>Introductietekst (HTML toegestaan)</label><textarea id="ri-tekst" rows="5"></textarea></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.25rem;margin-top:1.5rem">
+      ${cats.map(c => `
+      <div class="upload-dash-box">
+        <div class="dash-section-title">${c.label}</div>
+        <div class="fg"><label>Titel</label><input id="ri-${c.key}Title" placeholder="${c.label.replace(/^[^ ]+ /,'')}"></div>
+        <div class="fg"><label>Tekst</label><textarea id="ri-${c.key}Text" rows="3"></textarea></div>
+        <div class="fg"><label>Foto URL</label><input id="ri-${c.key}Img" placeholder="https://..."></div>
+      </div>`).join('')}
+    </div>`;
+
+  // Laad bestaande data
+  try {
+    const snap = await getDoc(doc(db,'siteContent','recepten-intro'));
+    if (snap.exists()) {
+      const d = snap.data();
+      const set = (id,val) => { const el=document.getElementById(id); if(el) el.value=val||''; };
+      set('ri-title',d.title); set('ri-sub',d.sub);
+      set('ri-heroImg',d.heroImg); set('ri-tekst',d.tekst);
+      cats.forEach(c => {
+        set('ri-'+c.key+'Title', d[c.key+'Title']);
+        set('ri-'+c.key+'Text', d[c.key+'Text']);
+        set('ri-'+c.key+'Img', d[c.key+'Img']);
+      });
+    }
+  } catch(e) { console.warn('Laden fout:', e.message); }
+}
+
+window.saveReceptenIntro = async () => {
+  const get = id => (document.getElementById(id)||{}).value||'';
+  const cats = ['gerecht','drank','thee','dessert','verzorging'];
+  const data = {
+    title: get('ri-title'), sub: get('ri-sub'),
+    heroImg: get('ri-heroImg'), tekst: get('ri-tekst'),
+  };
+  cats.forEach(c => {
+    data[c+'Title'] = get('ri-'+c+'Title');
+    data[c+'Text']  = get('ri-'+c+'Text');
+    data[c+'Img']   = get('ri-'+c+'Img');
+  });
+  try {
+    await setDoc(doc(db,'siteContent','recepten-intro'), data);
+    toast('Recepten intro opgeslagen ✓','ok');
+  } catch(e) { toast('Fout: '+e.message,'err'); }
+};
+
+// ── Plagen & Ziektes editor ───────────────────────────────────
+function renderPestList(items, type) {
+  const listId = type === 'pest' ? 'pests-list' : 'diseases-list';
+  const el = document.getElementById(listId);
+  if (!el) return;
+  el.innerHTML = '';
+  (items||[]).forEach((item, idx) => {
+    el.appendChild(createPestCard(item, type, idx));
+  });
+}
+
+function createPestCard(item, type, idx) {
+  const div = document.createElement('div');
+  div.className = 'pest-card';
+  div.dataset.idx = idx;
+  div.dataset.type = type;
+  const label = type === 'pest' ? '🐛 Plaag' : '🍂 Ziekte';
+  div.innerHTML =
+    '<div class="pest-card-head">' +
+      '<span style="font-size:.78rem;font-weight:600;color:var(--text-muted)">' + label + ' ' + (idx+1) + '</span>' +
+      '<button class="btn-danger-sm" onclick="removePestCard(this)">🗑 Verwijderen</button>' +
+    '</div>' +
+    '<div class="fg"><label>Naam</label>' +
+      '<input type="text" class="pest-naam" value="' + (item.naam||'').replace(/"/g,'&quot;') + '" placeholder="bv. Bladluis"></div>' +
+    '<div class="fg"><label>Beschrijving</label>' +
+      '<textarea class="pest-beschrijving" rows="2" placeholder="Hoe herken je dit?">' + (item.beschrijving||'') + '</textarea></div>' +
+    '<div class="fg"><label>Voorkomen / behandeling</label>' +
+      '<textarea class="pest-voorkomen" rows="2" placeholder="Hoe voorkom of behandel je dit?">' + (item.voorkomen||'') + '</textarea></div>';
+  return div;
+}
+
+window.addPestEntry = (type) => {
+  const listId = type === 'pest' ? 'pests-list' : 'diseases-list';
+  const el = document.getElementById(listId);
+  if (!el) return;
+  const idx = el.children.length;
+  el.appendChild(createPestCard({naam:'',beschrijving:'',voorkomen:''}, type, idx));
+  // Re-number all cards
+  renumberPestCards(listId, type);
+};
+
+window.removePestCard = (btn) => {
+  const card = btn.closest('.pest-card');
+  const listId = card.dataset.type === 'pest' ? 'pests-list' : 'diseases-list';
+  card.remove();
+  renumberPestCards(listId, card.dataset.type);
+};
+
+function renumberPestCards(listId, type) {
+  const label = type === 'pest' ? '🐛 Plaag' : '🍂 Ziekte';
+  document.querySelectorAll('#' + listId + ' .pest-card').forEach((card, i) => {
+    card.dataset.idx = i;
+    const head = card.querySelector('.pest-card-head span');
+    if (head) head.textContent = label + ' ' + (i+1);
+  });
+}
+
+function collectPestEntries(type) {
+  const listId = type === 'pest' ? 'pests-list' : 'diseases-list';
+  const cards = document.querySelectorAll('#' + listId + ' .pest-card');
+  const result = [];
+  cards.forEach(card => {
+    const naam = card.querySelector('.pest-naam')?.value?.trim() || '';
+    const beschrijving = card.querySelector('.pest-beschrijving')?.value?.trim() || '';
+    const voorkomen = card.querySelector('.pest-voorkomen')?.value?.trim() || '';
+    if (naam || beschrijving || voorkomen) {
+      result.push({ naam, beschrijving, voorkomen });
+    }
+  });
+  return result;
+}
+
 // ── Toast ──────────────────────────────────────────────────────
 function toast(msg,type='ok'){
   const el=document.getElementById('toast');el.textContent=msg;
@@ -1422,6 +1568,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   background:transparent;border:1px solid var(--border);color:var(--text-muted);
   border-radius:var(--radius);font-size:.8rem;cursor:pointer;transition:all .15s;}
 .btn-back:hover{border-color:var(--text-muted);color:var(--text);}
+.pest-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem;margin-bottom:.6rem;}
+.pest-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;}
+.pest-card .fg{margin-bottom:.4rem;}
+.pest-card input,.pest-card textarea{background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);font-family:'Inter',sans-serif;font-size:.8rem;padding:.4rem .6rem;width:100%;outline:none;}
+.pest-card input:focus,.pest-card textarea:focus{border-color:var(--green);}
+.pest-card textarea{resize:vertical;min-height:50px;}
 .btn-danger-sm{padding:.3rem .6rem;background:var(--red-light);border:1px solid rgba(220,38,38,.3);
   color:var(--red);border-radius:5px;font-size:.72rem;cursor:pointer;margin-top:.25rem;}
 
@@ -1744,6 +1897,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="nav-item" data-section="moestuin-intro" onclick="switchSection('moestuin-intro')">
         <span class="nav-icon">🌿</span> De Moestuin
       </div>
+      <div class="nav-item" data-section="recepten-intro" onclick="switchSection('recepten-intro')">
+        <span class="nav-icon">🍳</span> Recepten intro
+      </div>
       <div class="nav-item" data-section="paginas" onclick="switchSection('paginas')">
         <span class="nav-icon">📄</span> Pagina's
       </div>
@@ -1859,10 +2015,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <div id="unsplash-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.5rem;margin-top:.85rem"></div>
       </div>
       <div class="etab-panel" id="etab-plagen">
-        <div class="fg"><label>🐛 Insecten & plagen (JSON)</label>
-          <textarea id="ed-pests" rows="8" style="font-family:monospace;font-size:.72rem" placeholder='[{"naam":"Bladluis","beschrijving":"...","voorkomen":"..."}]'></textarea></div>
-        <div class="fg"><label>🍂 Ziektes (JSON)</label>
-          <textarea id="ed-diseases" rows="8" style="font-family:monospace;font-size:.72rem" placeholder='[{"naam":"Meeldauw","beschrijving":"...","voorkomen":"..."}]'></textarea></div>
+        <div class="dash-section-title" style="margin-bottom:.75rem">🐛 Insecten & plagen</div>
+        <div id="pests-list"></div>
+        <button class="btn-outline-sm" style="width:100%;margin-bottom:1.5rem" onclick="addPestEntry('pest')">+ Plaag toevoegen</button>
+        <div class="dash-section-title" style="margin-bottom:.75rem">🍂 Ziektes</div>
+        <div id="diseases-list"></div>
+        <button class="btn-outline-sm" style="width:100%;margin-bottom:.5rem" onclick="addPestEntry('disease')">+ Ziekte toevoegen</button>
+        <input type="hidden" id="ed-pests">
+        <input type="hidden" id="ed-diseases">
       </div>
     </div>
     <div class="editor-foot">
