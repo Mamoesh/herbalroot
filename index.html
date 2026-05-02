@@ -1980,6 +1980,7 @@ function openModal(id){
     <div class="companion-list" style="margin-bottom:1rem">
       ${h.bad.length?h.bad.map(b=>`<span class="companion bad">✗ ${b}</span>`).join(''):'<span style="color:var(--text2);font-size:.85rem">Geen bekende slechte buren</span>'}
     </div>
+  </div>`;
 
 
   const plagenPanel = '<div class="tab-content" id="panel-plagen">' +
@@ -2101,7 +2102,7 @@ async function fetchImageAsBlob(imgUrl) {
 function updateHerbImg(herbId, blobUrl) {
   const herb = HERBS.find(h => h.id === herbId);
   if (herb) herb.photo2 = blobUrl;
-  document.querySelectorAll(`[data-herbid="${herbId}"] .herb-card-img img`).forEach(img => {
+  document.querySelectorAll('[data-herbid="' + herbId + '"] .herb-card-img img').forEach(img => {
     img.src = blobUrl;
     img.style.display = 'block';
     const fb = img.parentElement.querySelector('.herb-img-fallback');
@@ -2114,7 +2115,7 @@ async function loadHerbPhoto(herbId, wikiTitle) {
   try {
     // 1. Fetch Wikipedia summary (CORS-open JSON API)
     const res = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${wikiTitle}`,
+      'https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(wikiTitle),
       { headers: { Accept: 'application/json' } }
     );
     if (!res.ok) return;
@@ -2194,7 +2195,7 @@ async function useGeoLocation() {
         navigator.geolocation.getCurrentPosition(res, rej, {timeout:8000})
       );
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
+        'https://nominatim.openstreetmap.org/reverse?lat=' + encodeURIComponent(pos.coords.latitude) + '&lon=' + encodeURIComponent(pos.coords.longitude) + '&format=json',
         {headers:{'Accept-Language':'nl'}}
       );
       const d = await r.json();
@@ -2203,7 +2204,7 @@ async function useGeoLocation() {
       if (cc) {
         const city = d.address?.city || d.address?.town || d.address?.village || '';
         const region = d.address?.state || '';
-        setGeoResult(cc, `${city}${region ? ', '+region : ''}`, d.address?.country||'', pos.coords.latitude, pos.coords.longitude);
+        setGeoResult(cc, city + (region ? ', ' + region : ''), d.address?.country||'', pos.coords.latitude, pos.coords.longitude);
         detected = true;
       }
     } catch(e) { /* GPS denied or timeout — fall through to IP */ }
@@ -2320,22 +2321,22 @@ function renderRecepten() {
   const html = catOrder.map(cat => {
     const g = groups[cat];
     if (!g.items.length) return '';
-    return `<div class="recept-section">
-      <div class="recept-section-title">${g.label}</div>
-      <div class="recept-grid">
-        ${g.items.map(r => {
+    return '<div class="recept-section">' +
+      '<div class="recept-section-title">' + g.label + '</div>' +
+      '<div class="recept-grid">' +
+        g.items.map(r => {
           const hasDetail = !!RECEPTEN_DB[r.naam];
-          const esc = r.naam.replace(/'/g, "\'");
-          return '<div class="recept-card has-detail" onclick="openReceptDetail(\'' + esc + '\',\''+r.herbId+'\')">'+
-            (!hasDetail ? '<span style="position:absolute;top:8px;right:8px;font-size:.6rem;background:var(--accent2);color:#0f1a0f;padding:.15rem .4rem;border-radius:100px">In opmaak</span>' : '')+
-            '<h3>'+r.naam+''+'</h3>'+
-            '<div class="recept-herb">'+r.herbEmoji+' '+r.herbNaam+'</div>'+
-            (r.tip ? '<div class="recept-desc">'+r.tip+'</div>' : '')+
-            '<span class="recept-tag '+r.cat+'">'+groups[r.cat].icon+' '+r.cat.charAt(0).toUpperCase()+r.cat.slice(1)+'</span>'+
+          const esc = r.naam.replace(/'/g, "\\'");
+          return '<div class="recept-card has-detail" onclick="openReceptDetail(\'' + esc + '\',\''+r.herbId+'\')">' +
+            (!hasDetail ? '<span style="position:absolute;top:8px;right:8px;font-size:.6rem;background:var(--accent2);color:#0f1a0f;padding:.15rem .4rem;border-radius:100px">In opmaak</span>' : '') +
+            '<h3>' + r.naam + '</h3>' +
+            '<div class="recept-herb">' + r.herbEmoji + ' ' + r.herbNaam + '</div>' +
+            (r.tip ? '<div class="recept-desc">' + r.tip + '</div>' : '') +
+            '<span class="recept-tag ' + r.cat + '">' + groups[r.cat].icon + ' ' + r.cat.charAt(0).toUpperCase() + r.cat.slice(1) + '</span>' +
             '</div>';
-        }).join('')}
-      </div>
-    </div>`;
+        }).join('') +
+      '</div>' +
+    '</div>';
   }).join('');
 
   document.getElementById('recepten-grid').innerHTML = html || '<p style="color:var(--text2)">Geen recepten gevonden.</p>';
@@ -2438,7 +2439,7 @@ function goToHuidRecept(herbId, receptTitel) {
   if (!recept) return;
 
   document.getElementById('recept-modal-title').textContent = recept.titel;
-  document.getElementById('recept-modal-meta').textContent = `${herb.emoji} ${herb.name} — Persoonlijke verzorging`;
+  document.getElementById('recept-modal-meta').textContent = '' + (herb.emoji) + ' ' + (herb.name) + ' — Persoonlijke verzorging';
 
   document.getElementById('recept-modal-body').innerHTML = `
     <div class="section-h" style="margin-top:0">👩‍🔬 Stap voor stap</div>
