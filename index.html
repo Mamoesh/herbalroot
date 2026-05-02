@@ -398,13 +398,10 @@ select option{background:var(--surface2);}
       </div>
     </div>
     <div class="nav-dropdown" id="nav-recepten-wrap">
-      <button class="nav-dropdown-btn" id="nav-recepten" onclick="toggleNavDropdownById(event,'nav-recepten-menu','nav-recepten-wrap')">
+      <button class="nav-dropdown-btn" id="nav-recepten" onclick="handleReceptenClick(event)">
         🍳 <span>Recepten</span> <span class="nav-dropdown-arrow">▾</span>
       </button>
       <div class="nav-dropdown-menu" id="nav-recepten-menu">
-        <button onclick="go('recepten-intro');closeAllDropdowns()">🍳 Overzicht</button>
-        <button onclick="go('recepten');filterRecepten('all',document.querySelector('#recept-filter-bar .filter-btn'));closeAllDropdowns()">📋 Alle recepten</button>
-        <div style="height:1px;background:var(--border);margin:.3rem 0"></div>
         <button onclick="go('recepten');filterReceptenDirect('gerecht');closeAllDropdowns()">🍽 Gerechten</button>
         <button onclick="go('recepten');filterReceptenDirect('soep');closeAllDropdowns()">🥣 Soepen</button>
         <button onclick="go('recepten');filterReceptenDirect('drank');closeAllDropdowns()">🥤 Dranken</button>
@@ -719,9 +716,30 @@ select option{background:var(--surface2);}
         <div class="mic-emoji" id="ri-gerecht-emoji">🍽</div>
       </div>
       <div class="mic-body">
-        <div class="mic-title" id="ri-gerecht-title">Gerechten & Soepen</div>
+        <div class="mic-title" id="ri-gerecht-title">Gerechten</div>
         <div class="mic-text" id="ri-gerecht-text">Heerlijke maaltijden met verse ingrediënten uit de moestuin.</div>
         <button class="btn" style="margin-top:.85rem;font-size:.78rem;padding:.4rem .9rem;display:inline-flex;width:auto">Bekijk gerechten →</button>
+      </div>
+    </div>
+    <div class="moestuin-intro-card" onclick="go('recepten');filterReceptenDirect('soep')">
+      <div class="mic-img-wrap">
+        <img id="ri-soep-img" src="" alt="Soepen" style="display:none">
+        <div class="mic-emoji" id="ri-soep-emoji">🥣</div>
+      </div>
+      <div class="mic-body">
+        <div class="mic-title" id="ri-soep-title">Soepen</div>
+        <div class="mic-text" id="ri-soep-text">Warme en koude soepen met groenten en kruiden uit eigen tuin.</div>
+        <button class="btn" style="margin-top:.85rem;font-size:.78rem;padding:.4rem .9rem;display:inline-flex;width:auto">Bekijk soepen →</button>
+      </div>
+    </div>
+    <div class="moestuin-intro-card" onclick="go('recepten');filterReceptenDirect('all')">
+      <div class="mic-img-wrap">
+        <div class="mic-emoji">📋</div>
+      </div>
+      <div class="mic-body">
+        <div class="mic-title">Alle recepten</div>
+        <div class="mic-text">Bekijk alle recepten in één overzicht — gerechten, soepen, dranken, thee, desserts en verzorging.</div>
+        <button class="btn" style="margin-top:.85rem;font-size:.78rem;padding:.4rem .9rem;display:inline-flex;width:auto">Bekijk alle recepten →</button>
       </div>
     </div>
     <div class="moestuin-intro-card" onclick="go('recepten');filterReceptenDirect('drank')">
@@ -779,7 +797,7 @@ select option{background:var(--surface2);}
     <input type="text" id="recept-search" placeholder="🔍  Zoek op ingrediënt, gerecht of kruid..." oninput="filterReceptenBySearch()" style="max-width:100%">
   </div>
   <div class="filter-bar" id="recept-filter-bar">
-    <button class="filter-btn active" onclick="filterRecepten('all',this)">Alles</button>
+    <button class="filter-btn active" onclick="filterRecepten('all',this)">Alle recepten</button>
     <button class="filter-btn" onclick="filterRecepten('gerecht',this)">🍽 Gerechten</button>
     <button class="filter-btn" onclick="filterRecepten('soep',this)">🥣 Soepen</button>
     <button class="filter-btn" onclick="filterRecepten('drank',this)">🥤 Dranken</button>
@@ -1555,6 +1573,22 @@ let filt='all',selHerb=null,step=0;
 // ═══════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════
+function handleReceptenClick(e) {
+  e.stopPropagation();
+  const wrap = document.getElementById('nav-recepten-wrap');
+  const rect = e.currentTarget.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const isArrowArea = clickX > rect.width - 30;
+  if (isArrowArea) {
+    const isOpen = wrap.classList.contains('open');
+    closeAllDropdowns();
+    if (!isOpen) wrap.classList.add('open');
+  } else {
+    closeAllDropdowns();
+    go('recepten-intro');
+  }
+}
+
 function handleMoetuinClick(e) {
   e.stopPropagation();
   const wrap = document.getElementById('nav-moestuin-wrap');
