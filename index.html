@@ -293,13 +293,20 @@ select option{background:var(--surface2);}
 .upload-btn-area .upload-icon{font-size:2rem;margin-bottom:.5rem;}
 
 /* ── DE MOESTUIN INTRO ── */
+/* ── RECEPTEN INTRO GRID ── */
+.recepten-intro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-top:.5rem;}
+.recepten-intro-grid .moestuin-intro-card{flex-direction:column;}
+.recepten-intro-grid .mic-img-wrap{width:100%;min-width:unset;height:130px;}
+.recepten-intro-grid .mic-body{padding:.85rem 1rem;align-items:flex-start;}
+.recepten-intro-grid .mic-title{font-size:1rem;}
+.recepten-intro-grid .mic-text{font-size:.82rem;}
 .moestuin-intro-grid{display:flex;flex-direction:column;gap:1.25rem;margin-top:.5rem;}
 .moestuin-intro-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .2s;display:flex;flex-direction:row;align-items:stretch;}
 .moestuin-intro-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--shadow);}
 .mic-img-wrap{width:220px;min-width:220px;background:var(--surface2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;flex-shrink:0;}
 .mic-img-wrap img{width:100%;height:100%;object-fit:cover;}
 .mic-emoji{font-size:3.5rem;}
-.mic-body{padding:1.25rem 1.5rem;flex:1;display:flex;flex-direction:column;justify-content:center;}
+.mic-body{padding:1.25rem 1.5rem;flex:1;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;}
 .mic-title{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--accent3);margin-bottom:.5rem;font-weight:700;}
 .mic-text{font-size:.88rem;color:var(--text2);line-height:1.75;flex:1;}
 @media(max-width:600px){.moestuin-intro-card{flex-direction:column;}.mic-img-wrap{width:100%;min-width:unset;height:160px;}}
@@ -709,7 +716,17 @@ select option{background:var(--surface2);}
   <div class="section-title" id="ri-title">🍳 Recepten & Dranken</div>
   <div class="section-sub" id="ri-sub">Van kruideninfusies tot heerlijke gerechten — ontdek onze recepten.</div>
   <div id="ri-tekst" style="color:var(--text2);line-height:1.8;margin:1rem 0 2rem;font-size:.95rem"></div>
-  <div class="moestuin-intro-grid">
+  <div class="recepten-intro-grid">
+    <div class="moestuin-intro-card" onclick="go('recepten');filterReceptenDirect('all')">
+      <div class="mic-img-wrap">
+        <div class="mic-emoji">📋</div>
+      </div>
+      <div class="mic-body">
+        <div class="mic-title">Alle recepten</div>
+        <div class="mic-text">Bekijk alle recepten in één overzicht — gerechten, soepen, dranken, thee, desserts en verzorging.</div>
+        <button class="btn" style="margin-top:.85rem;font-size:.78rem;padding:.4rem .9rem;display:inline-flex;width:auto">Bekijk alle recepten →</button>
+      </div>
+    </div>
     <div class="moestuin-intro-card" onclick="go('recepten');filterReceptenDirect('gerecht')">
       <div class="mic-img-wrap">
         <img id="ri-gerecht-img" src="" alt="Gerechten" style="display:none">
@@ -730,16 +747,6 @@ select option{background:var(--surface2);}
         <div class="mic-title" id="ri-soep-title">Soepen</div>
         <div class="mic-text" id="ri-soep-text">Warme en koude soepen met groenten en kruiden uit eigen tuin.</div>
         <button class="btn" style="margin-top:.85rem;font-size:.78rem;padding:.4rem .9rem;display:inline-flex;width:auto">Bekijk soepen →</button>
-      </div>
-    </div>
-    <div class="moestuin-intro-card" onclick="go('recepten');filterReceptenDirect('all')">
-      <div class="mic-img-wrap">
-        <div class="mic-emoji">📋</div>
-      </div>
-      <div class="mic-body">
-        <div class="mic-title">Alle recepten</div>
-        <div class="mic-text">Bekijk alle recepten in één overzicht — gerechten, soepen, dranken, thee, desserts en verzorging.</div>
-        <button class="btn" style="margin-top:.85rem;font-size:.78rem;padding:.4rem .9rem;display:inline-flex;width:auto">Bekijk alle recepten →</button>
       </div>
     </div>
     <div class="moestuin-intro-card" onclick="go('recepten');filterReceptenDirect('drank')">
