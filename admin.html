@@ -1305,10 +1305,11 @@ window.saveMoetuinIntro = async () => {
 // ── Recepten Intro beheer ─────────────────────────────────────
 async function renderReceptenIntroAdmin() {
   const cats = [
-    {key:'gerecht', label:'🍽 Gerechten & Soepen'},
-    {key:'drank',   label:'🥤 Dranken & Cocktails'},
-    {key:'thee',    label:'🍵 Thee & Infusies'},
-    {key:'dessert', label:'🍰 Desserts'},
+    {key:'gerecht',    label:'🍽 Gerechten'},
+    {key:'soep',       label:'🥣 Soepen'},
+    {key:'drank',      label:'🥤 Dranken & Cocktails'},
+    {key:'thee',       label:'🍵 Thee & Infusies'},
+    {key:'dessert',    label:'🍰 Desserts'},
     {key:'verzorging', label:'✨ Verzorgingsproducten'},
   ];
 
@@ -1356,7 +1357,7 @@ async function renderReceptenIntroAdmin() {
 
 window.saveReceptenIntro = async () => {
   const get = id => (document.getElementById(id)||{}).value||'';
-  const cats = ['gerecht','drank','thee','dessert','verzorging'];
+  const cats = ['gerecht','soep','drank','thee','dessert','verzorging'];
   const data = {
     title: get('ri-title'), sub: get('ri-sub'),
     heroImg: get('ri-heroImg'), tekst: get('ri-tekst'),
